@@ -1,0 +1,1 @@
+<?php header("Location: http://www.roblox.com".$_SERVER['REQUEST_URI']);
