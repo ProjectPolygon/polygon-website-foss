@@ -1,0 +1,9 @@
+body
+{
+	background: radial-gradient(ellipse at bottom, #fff 0%, #75788a 100%);
+}
+
+.navbar-orange, .nav-item .dropdown-menu 
+{
+    background-color: #919191;
+}

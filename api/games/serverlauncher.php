@@ -1,0 +1,74 @@
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+
+header("Pragma: no-cache");
+header("Cache-Control: no-cache");
+
+Polygon::ImportClass("Games");
+Polygon::ImportClass("Discord");
+
+api::initialize(["method" => "GET", "logged_in" => true, "secure" => true]);
+
+if (!Polygon::$GamesEnabled) api::respond(200, false, "Games are currently closed. See <a href=\"/forum\">this announcement</a> for more information.");
+
+$serverID = $_GET["serverID"] ?? $_GET['placeId'] ?? false;
+$isTeleport = isset($_GET["isTeleport"]) && $_GET['isTeleport'] == "true";
+
+if($isTeleport && GetUserAgent() != "Roblox/WinInet") 
+	api::respond_custom([
+		"Error" => "Request is not authorized from specified origin", 
+		"userAgent" => $_SERVER["HTTP_USER_AGENT"] ?? null, 
+		"referrer" => $_SERVER["HTTP_REFERER"] ?? null
+	]);
+
+/* if($isTeleport)
+{
+	$ticket = $_COOKIE['ticket'] ?? false;
+	$query = $pdo->prepare("SELECT uid FROM client_sessions WHERE ticket = :ticket");
+	$query->bindParam(":ticket", $ticket, PDO::PARAM_STR);
+	$query->execute();
+	if(!$query->rowCount()) api::respond_custom(["Error" => "You are not logged in"]);
+	$userid = $query->fetchColumn();
+}
+else
+{
+	if(!SESSION) api::respond(200, false, "You are not logged in");
+	$userid = SESSION["user"]["id"];
+} */
+
+// if (!Discord::IsVerified(SESSION["user"]["id"])) 
+//	api::respond(200, false, "You must verify yourself in the <a href=\"https://discord.com/invite/projectpolygon\">Discord server</a> before joining a game.");
+
+/* $query = $pdo->prepare("SELECT *, (SELECT COUNT(*) FROM client_sessions WHERE ping+35 > UNIX_TIMESTAMP() AND serverID = selfhosted_servers.id AND valid) AS players FROM selfhosted_servers WHERE id = :sid");
+$query->bindParam(":sid", $serverID, PDO::PARAM_INT);
+$query->execute();
+$serverInfo = $query->fetch(PDO::FETCH_OBJ); */
+
+$serverInfo = Games::GetServerInfo($serverID, SESSION["user"]["id"], true);
+
+if(!$serverInfo) api::respond(200, false, "Server does not exist");
+if(!$serverInfo->online) api::respond(200, false, "This server is currently offline.");
+if($serverInfo->players >= $serverInfo->maxplayers) api::respond(200, false, "This server is currently full. Please try again later");
+if($serverInfo->version == 2009 && SESSION["user"]["id"] > 200) api::respond(200, false, "2009 games are currently disabled.");
+
+$ticket = generateUUID();
+$securityTicket = generateUUID();
+db::run(
+	"INSERT INTO client_sessions (ticket, securityTicket, uid, sessionType, serverID, created, isTeleport, RequesterIP) 
+	VALUES (:uuid, :security, :uid, 1, :sid, UNIX_TIMESTAMP(), :teleport, :ip)",
+	[":uuid" => $ticket, ":security" => $securityTicket, ":uid" => SESSION["user"]["id"], ":sid" => $serverID, ":teleport" => (int)$isTeleport, ":ip" => GetIPAddress()]
+);
+
+$Protocol = "https";
+if($serverInfo->version == 2009) $Protocol = "http";
+
+api::respond_custom([
+	"status" => 200, 
+	"success" => true, 
+	"message" => "OK", 
+	"version" => $serverInfo->version, 
+	"joinScriptUrl" => "{$Protocol}://{$_SERVER['HTTP_HOST']}/game/join?ticket={$ticket}",
+	// these last few params are for teleportservice and lack any function - just ignore
+	"authenticationUrl" => "{$Protocol}://{$_SERVER['HTTP_HOST']}/Login/Negotiate.ashx",
+	"authenticationTicket" => "0",
+	"status" => 2
+]);

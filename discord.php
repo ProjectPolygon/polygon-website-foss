@@ -1,0 +1,1 @@
+<?php header("Location: https://discord.gg/S3ukesvxeb"); // header("Location: https://discord.gg/kefCr8KR"); //header("Location: https://discord.gg/uKChA9R");

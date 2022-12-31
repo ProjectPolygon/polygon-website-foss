@@ -1,0 +1,170 @@
+/* dark mode by uzi$laya_Alex_2k41 */
+
+/* body color & navbar */
+
+body {
+    background-color: #202020;
+    color: #e8e7e7;
+    background: radial-gradient(ellipse at bottom, #1b2735 50%, #090a0f 100%);
+}
+
+.navbar-orange, .nav-item .dropdown-menu {
+    background-color: #171717;
+}
+
+
+/* table */
+
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    color: #fff;
+    background-color: #fff0;
+}
+
+.table .bg-light {
+    background-color: transparent!important;
+}
+
+.table>tbody>tr:hover {
+    color: #e8e8e8;
+    background-color: #262626;
+}
+
+/* cards */
+
+.card {
+    border: 1px solid #000!important;
+    background-color: #202020;
+}
+
+.card.details { border-top: none!important; } 
+
+.card-header {
+    background-color: #262626!important;
+   	border: none;
+}
+
+.card-body {
+    background-color: #202020;
+}
+
+textarea { background-color: #202020!important; }
+
+/* breadcrumbs */
+
+.breadcrumb {
+    background-color: #262626;
+}
+
+.breadcrumb-item.active {
+    color: #d9d9d9;
+}
+
+/* tabs */
+.nav-tabs .nav-link.active {
+    background-color: #202020;
+    border-color: #ffffff #ffffff #202020!important;
+    color: #FFFFFF;
+}
+
+.flex-column .nav-link
+{ 
+	border-right: none; 
+} 
+
+.flex-column .nav-link.active
+{
+	border-color: #ffffff #ffffff #ffffff!important;
+}
+
+
+/* form controls */
+.form-control {
+    background-color: #060606;
+    border: 1px solid #333;
+    color: #FFFFFF;
+}
+
+.form-control:hover {
+    background-color: #151515;
+}
+
+.form-control:focus {
+    background-color: #151515;
+    color: #fff!important;
+}
+
+/* catalog */
+.breadcrumb.bg-white.p-0.m-0 {
+    background-color: #fff0!important;
+}
+
+.breadcrumb-item.text-dark.active {
+    color: #FFF!important;
+}
+
+.card-img-top.img-fluid.p-2 {
+    background-color: #171717!important;
+}
+
+.text-dark {
+    color: #FFF!important;
+}
+
+.BuyPriceBox {
+    background-color: #262626!important;
+}
+
+.dropdown-menu {
+    background-color: #202020!important;
+    border: 1px solid #000 !important;
+}
+
+.dropdown-menu .dropdown-item 
+{ 
+	color: #fff!important;  
+}
+
+.dropdown-menu .dropdown-item:hover
+{ 
+	background-color:#000;  
+}
+
+.dropdown-item.assetTypeFilter {
+    color: #dfdfdf!important;
+}
+
+.dropdown-item.assetTypeFilter:hover {
+    background-color: #060606!important;
+    color: #fff!important;
+}
+
+/* table heads */
+
+.table thead th {
+    vertical-align: bottom;
+    border-top: none;
+    background-color: #262626;
+}
+
+/* friend cards (profile) */
+
+.friend-card>.card, .item>.card {
+    background-color: #111!important;
+}
+
+/* modals */
+
+.modal-body, .modal-footer {
+    background-color: #131313;
+}
+
+pre { color: white; }
+
+.bg-cardpanel { background-color: #262626!important; }
+
+.items .item-striped:nth-of-type(2n) 
+{
+    background-color: #262626;
+}
