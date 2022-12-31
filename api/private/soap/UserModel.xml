@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+	<soap:Body>
+		<OpenJobEx xmlns="http://roblox.com/">
+			<job>
+				<id>{JobID}</id>
+				<expirationInSeconds>60</expirationInSeconds>
+				<category>1</category>
+				<cores>1</cores>
+			</job>
+			<script>
+				<name>RenderScript</name>
+				<script>
+-- Model v1.0.2
+
+local baseUrl, thumbnailKey, renderType, assetId, synchronous = ...
+
+local ThumbnailGenerator = game:GetService("ThumbnailGenerator")
+
+pcall(function()
+    game:GetService("ContentProvider"):SetBaseUrl(baseUrl)
+    game:GetService("InsertService"):SetAssetUrl(baseUrl .. "/Asset/?id=%d")
+    game:GetService("InsertService"):SetAssetVersionUrl(baseUrl .. "/Asset/?assetversionid=%d")
+end)
+
+game:GetService("HttpService").HttpEnabled = true
+game:GetService("ScriptContext").ScriptsDisabled = true
+	
+print("[" .. game.JobId .. "] Starting new render for " .. renderType .. " ID " .. assetId)
+game:HttpPost(baseUrl .. "/api/render/update?ApiKey=" .. thumbnailKey .. "&amp;RenderJobID=" .. game.JobId, '{"Status": 1}', synchronous, "text/plain", true)
+
+local click = false
+
+for _, object in pairs(game:GetObjects(baseUrl .. "/Asset/?id=" .. assetId)) do
+	if object:IsA("Sky") then
+		local resultValues = nil
+		local success = pcall(function() click = ThumbnailGenerator:ClickTexture(object.SkyboxFt, "PNG", 420, 420) end)
+		if not success then
+			object.Parent = game:GetService("Lighting")
+			click = ThumbnailGenerator:Click("PNG", 420, 420, false)
+		end
+	-- elseif object:IsA("LuaSourceContainer") then
+	--	  return ThumbnailGenerator:ClickTexture(baseUrl.. "Thumbs/Script.png", fileExtension, x, y)
+	-- elseif object:IsA("SpecialMesh") then
+	--	  local part = Instance.new("Part")
+	--	  part.Parent = workspace
+	--	  object.Parent = part
+	--	  return ThumbnailGenerator:Click(fileExtension, x, y, --[[hideSky = ]] true)
+	else
+		pcall(function() object.Parent = workspace end)
+		click = ThumbnailGenerator:Click("PNG", 1024, 1024, true)
+	end
+end
+
+result = '{"Status": 2, "Click": "' .. tostring(click) .. '"}'
+print("[" .. game.JobId .. "] Successfully rendered, moving on...")
+
+while true do
+    success, error = pcall(function() game:HttpPost(baseUrl .. "/api/render/update?ApiKey=" .. thumbnailKey .. "&amp;RenderJobID=" .. game.JobId, result, true, "text/plain", true) end)
+    if not success then
+        print("[" .. game.JobId .. "] An error occurred! (" .. error .. "). Uploading again...")
+    else
+        print("[" .. game.JobId .. "] Upload successful! Moving on...")
+        break
+    end
+end					
+				</script>
+				<arguments>
+                    <LuaValue>
+                        <type>LUA_TSTRING</type>
+                        <value>{BaseURL}</value>
+                    </LuaValue>
+                    <LuaValue>
+                        <type>LUA_TSTRING</type>
+                        <value>{ThumbnailKey}</value>
+                    </LuaValue>
+                    <LuaValue>
+                        <type>LUA_TSTRING</type>
+                        <value>{RenderType}</value>
+                    </LuaValue>
+                    <LuaValue>
+                        <type>LUA_TNUMBER</type>
+                        <value>{AssetID}</value>
+                    </LuaValue>
+                    <LuaValue>
+                        <type>LUA_TBOOLEAN</type>
+                        <value>{Synchronous}</value>
+                    </LuaValue>
+                </arguments>
+			</script>
+		</OpenJobEx>
+	</soap:Body>
+</soap:Envelope>
