@@ -1,11 +1,12 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Thumbnails");
+Polygon::ImportClass("Forum");
 
-$threadInfo = forum::getThreadInfo($_GET['PostID'] ?? false);
+$threadInfo = Forum::GetThreadInfo($_GET['PostID'] ?? false);
 
 if(!$threadInfo || $threadInfo->deleted && (!SESSION || !SESSION["adminLevel"])) pageBuilder::errorCode(404);
 
-$authorInfo = users::getUserInfoFromUid($threadInfo->author);
+$authorInfo = Users::GetInfoFromID($threadInfo->author);
 
 //markdown
 $markdown = new Parsedown();
@@ -24,7 +25,7 @@ $repliescount->execute();
 $pages = ceil($repliescount->fetchColumn()/10);
 $offset = ($page - 1)*10;
 
-$subforumInfo = forum::getSubforumInfo($threadInfo->subforumid);
+$subforumInfo = Forum::GetSubforumInfo($threadInfo->subforumid);
 
 $replies = $pdo->prepare("SELECT * FROM forum_replies WHERE threadId = :id AND NOT deleted ORDER BY id ASC LIMIT 10 OFFSET :offset");
 $replies->bindParam(":id", $threadInfo->id, PDO::PARAM_INT);
@@ -36,15 +37,15 @@ pagination::$pages = $pages;
 pagination::$url = '/forum/showpost?PostID='.$threadInfo->id.'&page=';
 pagination::initialize();
 
-pageBuilder::$pageConfig["title"] = polygon::filterText($threadInfo->subject, true, false)." - ".polygon::replaceVars($subforumInfo->name);
-pageBuilder::$pageConfig["og:description"] = polygon::filterText($threadInfo->body, true, false);
+pageBuilder::$pageConfig["title"] = Polygon::FilterText($threadInfo->subject, true, false)." - ".Polygon::ReplaceVars($subforumInfo->name);
+pageBuilder::$pageConfig["og:description"] = Polygon::FilterText($threadInfo->body, true, false);
 pageBuilder::buildHeader();
 ?>
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
   	<li class="breadcrumb-item"><a href="/forum"><?=SITE_CONFIG["site"]["name"]?> Forum</a></li>
-    <li class="breadcrumb-item"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=polygon::replaceVars($subforumInfo->name)?></a></li>
-    <li class="breadcrumb-item active" aria-current="page"><p class="m-0"><?=polygon::filterText($threadInfo->subject)?></p></li>
+    <li class="breadcrumb-item"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=Polygon::ReplaceVars($subforumInfo->name)?></a></li>
+    <li class="breadcrumb-item active" aria-current="page"><p class="m-0"><?=Polygon::FilterText($threadInfo->subject)?></p></li>
   </ol>
 </nav>
 
@@ -62,7 +63,7 @@ pageBuilder::buildHeader();
 
 <div class="card">
 	<div class="card-header bg-primary text-white">
-	    <?=polygon::filterText($threadInfo->subject)?>
+	    <?=Polygon::FilterText($threadInfo->subject)?>
 	</div>
 </div>
 <div class="card-body">
@@ -71,7 +72,7 @@ pageBuilder::buildHeader();
 			<p class="m-0"><a href="/user?ID=<?=$threadInfo->author?>" class="pl-1"><?=$authorInfo->username?></a><?php if($authorInfo->adminlevel == 2) { ?> <i class="fas fa-badge-check text-primary" data-toggle="tooltip" title="Administrator"></i><?php } ?></p>
 			<img src="<?=Thumbnails::GetAvatar($threadInfo->author, 110, 110)?>" title="<?=$authorInfo->username?>" alt="<?=$authorInfo->username?>" class="img-fluid">
 			<p class="m-0">Joined: <?=date('j/n/Y', $authorInfo->jointime)?></p>
-			<p class="m-0">Total posts: <?=users::getForumPostCount($threadInfo->author)?></p>
+			<p class="m-0">Total posts: <?=Users::GetForumPostCount($threadInfo->author)?></p>
 		</div>
 		<div class="col-md-10" style="word-wrap: break-word;">
 			<small>Posted on <?=date('F j Y \a\t g:i:s A', $threadInfo->postTime);?></small> 
@@ -83,18 +84,18 @@ pageBuilder::buildHeader();
 			</span>
 			<?php } ?>
 			<br>
-			<?=polygon::filterText($markdown->text($threadInfo->body, $authorInfo->adminlevel == 2), false)?>
+			<?=Polygon::FilterText($markdown->text($threadInfo->body, $authorInfo->adminlevel == 2), false)?>
 		</div>
 	</div>
 </div>
-<?php while($reply = $replies->fetch(PDO::FETCH_OBJ)) { $authorInfo = users::getUserInfoFromUid($reply->author); ?>
+<?php while($reply = $replies->fetch(PDO::FETCH_OBJ)) { $authorInfo = Users::GetInfoFromID($reply->author); ?>
 <div class="card-body divider-top" id="reply<?=$reply->id?>">
 	<div class="row">
 		<div class="col-md-2 divider-right mb-2 pb-2">
 			<p class="m-0"><a href="/user?ID=<?=$reply->author?>" class="pl-1"><?=$authorInfo->username?></a> <?php if($authorInfo->adminlevel == 2) { ?> <i class="fas fa-badge-check text-primary" data-toggle="tooltip" title="Administrator"></i><?php } ?></p>
 			<img src="<?=Thumbnails::GetAvatar($reply->author, 110, 110)?>" title="<?=$authorInfo->username?>" alt="<?=$authorInfo->username?>" class="img-fluid">
 			<p class="m-0">Joined: <?=date('j/n/Y', $authorInfo->jointime)?></p>
-			<p class="m-0">Total posts: <?=users::getForumPostCount($reply->author)?></p>
+			<p class="m-0">Total posts: <?=Users::GetForumPostCount($reply->author)?></p>
 		</div>
 		<div class="col-md-10" style="word-wrap: break-word;">
 			<small>Posted on <?=date('F j Y \a\t g:i:s A', $reply->postTime);?> <?php if($reply->deleted){ ?><span class="text-danger">This is a deleted reply</span><?php } ?></small> 
@@ -106,7 +107,7 @@ pageBuilder::buildHeader();
 			</span>
 			<?php } ?>
 			<br>
-			<?=polygon::filterText($markdown->text($reply->body, $authorInfo->adminlevel == 2), false)?>
+			<?=Polygon::FilterText($markdown->text($reply->body, $authorInfo->adminlevel == 2), false)?>
 		</div>
 	</div>
 </div>
@@ -124,8 +125,8 @@ pageBuilder::buildHeader();
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
   	<li class="breadcrumb-item"><a href="/forum"><?=SITE_CONFIG["site"]["name"]?> Forum</a></li>
-    <li class="breadcrumb-item active"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=polygon::replaceVars($subforumInfo->name)?></a></li>
-    <li class="breadcrumb-item active" aria-current="page"><p class="m-0"><?=polygon::filterText($threadInfo->subject)?></p></li>
+    <li class="breadcrumb-item active"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=Polygon::ReplaceVars($subforumInfo->name)?></a></li>
+    <li class="breadcrumb-item active" aria-current="page"><p class="m-0"><?=Polygon::FilterText($threadInfo->subject)?></p></li>
   </ol>
 </nav>
 

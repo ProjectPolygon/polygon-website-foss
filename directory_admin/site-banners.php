@@ -1,7 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-if(!SESSION || !SESSION["adminLevel"]){ pageBuilder::errorCode(404); }
-
+Users::RequireAdmin(Users::STAFF_ADMINISTRATOR);
 $error = false;
 $panel = "create";
 if($_SERVER['REQUEST_METHOD'] == "POST")
@@ -27,7 +26,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
         [":uid" => SESSION["userId"], ":text" => $text, ":bgc" => $backcolor, ":tc" => $textcolor]
       );
 
-      users::logStaffAction("[ Banners ] Created site banner with text: ".$text); 
+      Users::LogStaffAction("[ Banners ] Created site banner with text: ".$text); 
     }
   }
   else//if($mode == "delete")
@@ -37,7 +36,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
     db::run("UPDATE announcements SET activated = 0 WHERE id = :id", [":id" => $id]);
   }
 
-  polygon::fetchAnnouncements();
+  Polygon::GetAnnouncements();
 }
 
 pageBuilder::$CSSdependencies[] = "/css/bootstrap-colorpicker.min.css";
@@ -98,7 +97,7 @@ pageBuilder::buildHeader();
       <p class="text-center">there's no announcements rn</p>
       <?php } foreach($announcements as $announcement) { ?>
       <div class="alert py-2 mb-0 rounded-0 text-center text-<?=$announcement["textcolor"]?>" role="alert" style="background-color: <?=$announcement["bgcolor"]?>">
-        <p><?=$markdown->line($announcement["text"])?> [created by <?=users::getUserNameFromUid($announcement["createdBy"])?>] <button class="btn btn-sm btn-light ml-2 px-3" type="submit" name="delete" value="<?=$announcement["id"]?>">Delete</button></p>
+        <p><?=$markdown->line($announcement["text"])?> [created by <?=Users::GetNameFromID($announcement["createdBy"])?>] <button class="btn btn-sm btn-light ml-2 px-3" type="submit" name="delete" value="<?=$announcement["id"]?>">Delete</button></p>
       </div>
       <?php } ?>
     </div>
@@ -124,18 +123,6 @@ pageBuilder::buildHeader();
   $('#text').on('keyup', this, function()
   { 
     $('#banner-preview').find(".container").html(md.render(this.value)); 
-  });
-
-  $('button[data-control$="addBanner"]').on('click', this, function()
-  {
-    var button = this; 
-    $(button).attr("disabled", "disabled").find("span").show();
-    $.post('/api/admin/addBanner', {"text":$("#text").val(), "bg-color":$("#bg-color").val(), "text-color":$("#text-color").val()}, function(data)
-    {
-      if(data.success){ toastr["success"](data.message); }
-      else{ toastr["error"](data.message); }
-      $(button).removeAttr("disabled").find("span").hide();
-    });
   });
 </script>
 

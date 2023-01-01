@@ -1,5 +1,6 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Thumbnails");
+
 $categories = 
 [
     0=>"Bricks", 
@@ -92,7 +93,7 @@ $query->execute();
     </div>
     <?php } ?>
     <div id="ToolboxItems">
-      <?php while($row = $query->fetch(PDO::FETCH_OBJ)) { $name = polygon::filterText($row->name); ?>
+      <?php while($row = $query->fetch(PDO::FETCH_OBJ)) { $name = Polygon::FilterText($row->name); ?>
       <a class="ToolboxItem" title="<?=$name?>" href="javascript:insertContent(<?=$row->id?>)" ondragstart="dragRBX(<?=$row->id?>)" onmouseover="this.style.borderStyle='outset'" onmouseout="this.style.borderStyle='solid'" style="border-style: solid;display:inline-block;height:60px;width:60px;cursor:pointer;">
       <img width="60" src="<?=Thumbnails::GetAsset($row, 75, 75)?>" border="0" id="img" alt="<?=$name?>">
       </a>

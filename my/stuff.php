@@ -1,9 +1,9 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+Users::RequireLogin();
 
-pageBuilder::$polygonScripts[] = "/js/polygon/inventory.js";
-pageBuilder::$pageConfig["app-attributes"] = ' data-user-id="'.SESSION["userId"].'"';
+pageBuilder::$polygonScripts[] = "/js/polygon/inventory.js?t=".time();
+pageBuilder::$pageConfig["app-attributes"] = " data-user-id=\"".SESSION["userId"]."\"";
 pageBuilder::$pageConfig["title"] = "Inventory";
 pageBuilder::buildHeader();
 ?>
@@ -51,26 +51,27 @@ pageBuilder::buildHeader();
 			</div>
 			<div class="items row"></div>
 			<div class="pagination form-inline justify-content-center d-none">
-				<button type="button" class="btn btn-light back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
-				<span class="px-3">Page <input class="form-control form-control-sm text-center mx-1 page" type="text" data-last-page="1" style="width:30px"> of <span class="pages">10</span></span>
-				<button type="button" class="btn btn-light next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
+				<button type="button" class="btn btn-light mx-2 back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
+				<span>Page</span> 
+				<input class="form-control form-control-sm text-center mx-1 px-0 page" type="text" data-last-page="1" style="width:40px"> 
+				<span>of <span class="pages">10</span></span>
+				<button type="button" class="btn btn-light mx-2 next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
+			</div>
+			<div class="template d-none">
+			  	<div class="item col-xl-2 col-lg-3 col-md-3 col-sm-4 col-6 pb-3 px-2">
+					<a href="$url">
+				  		<div class="card hover h-100">
+				    		<img preload-src="$item_thumbnail" class="card-img-top img-fluid p-2" title="$item_name" alt="$item_name">
+							<div class="card-body pt-0 px-2 pb-2" style="line-height:normal">
+					  			<p class="text-truncate text-primary m-0" title="$item_name"><a href="$url">$item_name</a></p>
+					  			<p class="tex-truncate m-0"><small class="text-muted">Creator: <a href="/user?ID=$creator_id">$creator_name</a></small></p>
+					  			<p class="text-success m-0">$price</p>
+							</div>
+				  		</div>
+					</a>
+			  	</div>
 			</div>
 		</div>
 	</div>
-</div>
-
-<div class="inventory-template d-none">
-  	<div class="item col-xl-2 col-lg-3 col-md-3 col-sm-4 col-6 pb-3 px-2">
-		<a href="$url">
-	  		<div class="card hover h-100">
-	    		<img src="$item_thumbnail" class="card-img-top img-fluid p-2" title="$item_name" alt="$item_name">
-				<div class="card-body pt-0 px-2 pb-2" style="line-height:normal">
-		  			<p class="text-truncate text-primary m-0" title="$item_name"><a href="$url">$item_name</a></p>
-		  			<p class="tex-truncate m-0"><small class="text-muted">Creator: <a href="/user?ID=$creator_id">$creator_name</a></small></p>
-		  			<p class="text-success m-0">$price</p>
-				</div>
-	  		</div>
-		</a>
-  	</div>
 </div>
 <?php pageBuilder::buildFooter(); ?>

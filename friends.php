@@ -1,6 +1,7 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-//users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Thumbnails");
+
+//Users::RequireLogin();
 
 if(isset($_GET['ID']) || isset($_GET['id']))
 {
@@ -13,7 +14,7 @@ else
 	$selfFriends = true;
 }
 
-$username = users::getUserNameFromUid($userid);
+$username = Users::GetNameFromID($userid);
 
 pageBuilder::$polygonScripts[] = "/js/polygon/friends.js?t=".time();
 pageBuilder::$pageConfig["app-attributes"] = ' data-user-id="'.$userid.'"';
@@ -43,8 +44,8 @@ pageBuilder::buildHeader();
 		<div class="pagination form-inline justify-content-center d-none">
 			<button type="button" class="btn btn-light mx-2 back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
 			<span>Page</span> 
-			<input class="form-control form-control-sm text-center mx-1 page" type="text" data-last-page="1" style="width:30px"> 
-			<span>of <span class="pages">1</span></span>
+			<input class="form-control form-control-sm text-center mx-1 px-0 page" type="text" data-last-page="1" style="width:40px"> 
+			<span>of <span class="pages">10</span></span>
 			<button type="button" class="btn btn-light mx-2 next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
 		</div>
 		<div class="template d-none">
@@ -63,7 +64,7 @@ pageBuilder::buildHeader();
 					</div>
 					<?php } ?>
 					<a href="/user?ID=$userid">
-						<img class="card-img-top img-fluid" src="$avatar" title="$username" alt="$username">
+						<img class="card-img-top img-fluid" src="<?=Thumbnails::GetStatus("rendering", 250, 250)?>" preload-src="$avatar" title="$username" alt="$username">
 					</a>
 					<a href="/user?ID=$userid">$username</a>
 				</div>
@@ -78,14 +79,16 @@ pageBuilder::buildHeader();
   		<p class="no-items"></p>
 		<div class="items row"></div>
 		<div class="pagination form-inline justify-content-center d-none">
-			<button type="button" class="btn btn-light back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
-			<span class="px-3">Page <input class="form-control form-control-sm text-center mx-1 page" type="text" data-last-page="1" style="width:30px"> of <span class="pages">10</span></span>
-			<button type="button" class="btn btn-light next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
+			<button type="button" class="btn btn-light mx-2 back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
+			<span>Page</span> 
+			<input class="form-control form-control-sm text-center mx-1 px-0 page" type="text" data-last-page="1" style="width:40px"> 
+			<span>of <span class="pages">10</span></span>
+			<button type="button" class="btn btn-light mx-2 next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
 		</div>
 		<div class="template d-none">
 			<div class="friend-request-card col-lg-2 pb-4 text-center">
 				<div class="card p-2">
-				  	<img class="card-img-top img-fluid" src="$avatar" title="$username" alt="$username">
+				  	<img class="card-img-top img-fluid" src="<?=Thumbnails::GetStatus("rendering", 250, 250)?>" preload-src="$avatar" title="$username" alt="$username">
 				  	<a href="/user?ID=$userid">$username</a>
 				  	<div class="btn-group">
 				  		<a class="btn btn-sm btn-primary friend-action" data-friend-action="accept" data-friend-id="$friendid">Accept</a>

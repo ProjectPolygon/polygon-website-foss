@@ -1,4 +1,5 @@
 <?php require $_SERVER['DOCUMENT_ROOT']."/api/private/core.php";
+Polygon::ImportClass("RBXClient");
 
 header("Pragma: no-cache");
 header("Cache-Control: no-cache");
@@ -130,7 +131,7 @@ if url~=nil then
 	end)
 end
 
-pcall(function() game:GetService("NetworkServer"):SetIsPlayerAuthenticationRequired(true) end)
+pcall(function() game:GetService("NetworkServer"):SetIsPlayerAuthenticationRequired(false) end)
 settings().Diagnostics.LuaRamLimit = 0
 --settings().Network:SetThroughputSensitivity(0.08, 0.01)
 --settings().Network.SendRate = 35
@@ -219,4 +220,4 @@ scriptContext.ScriptsDisabled = false
 ------------------------------END START GAME SHARED SCRIPT--------------------------
 
 
-<?php echo RBX::cryptSignScript(ob_get_clean());
+<?php echo RBXClient::CryptSignScript(ob_get_clean());

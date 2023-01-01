@@ -1,5 +1,6 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Thumbnails");
+
 api::initialize(["method" => "POST", "logged_in" => true, "secure" => true]);
 
 $userid = SESSION["userId"];
@@ -25,7 +26,7 @@ while($row = $query->fetch(PDO::FETCH_OBJ))
 { 
 	$friends[] = 
 	[
-		"username" => users::getUserNameFromUid($row->requesterId), 
+		"username" => Users::GetNameFromID($row->requesterId), 
 		"userid" => $row->requesterId, 
 		"avatar" => Thumbnails::GetAvatar($row->requesterId, 250, 250), 
 		"friendid" => $row->id

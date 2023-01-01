@@ -48,6 +48,13 @@ $bypassRules =
 	]
 ];
 
+if($_SERVER["HTTP_HOST"] == "chef.pizzaboxer.xyz") 
+{
+	header('HTTP/1.1 301 Moved Permanently');
+    header('Location: http://polygon.pizzaboxer.xyz'.$_SERVER['REQUEST_URI']);
+    exit;
+}
+
 if(
 	!isset($disableHTTPS) && 
 	isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 
@@ -60,27 +67,8 @@ if(
     exit;
 }
 
-require ROOT.'/api/private/vendors/Parsedown.php'; 
-
-$markdown = new Parsedown();
-$markdown->setMarkupEscaped(true);
-$markdown->setBreaksEnabled(true);
-$markdown->setSafeMode(true);
-$markdown->setUrlsLinked(true);
-
-require ROOT.'/api/private/db.php';
-
-polygon::fetchAnnouncements();
-
-require ROOT.'/api/private/pagebuilder.php';
-
 if($_SERVER['REQUEST_METHOD'] == 'POST') foreach($_POST as $key => $val){ $_POST[$key] = trim($val); }
 foreach($_GET as $key => $val){ $_GET[$key] = trim($val); }
-
-function polygon_error_handler()
-{
-	pageBuilder::errorCode(500);
-}
 
 // functions that arent strictly specifically for polygon and moreof to just 
 // extend basic php functionality like string manipulation or some small 
@@ -143,8 +131,36 @@ function redirect($url)
 	die(header("Location: $url"));
 }
 
-// https://stackoverflow.com/questions/1416697/converting-timestamp-to-time-ago-in-php-e-g-1-day-ago-2-days-ago
-// btw when you use this be sure to put the regular date format as a title or tooltip attribute
+function GetIPAddress()
+{
+	return $_SERVER["HTTP_CF_CONNECTING_IP"] ?? $_SERVER["HTTP_X_REAL_IP"] ?? $_SERVER["REMOTE_ADDR"];
+}
+
+function VerifyReCAPTCHA()
+{
+	$context  = stream_context_create(
+	[
+		'http' =>
+		[
+			'method'  => 'POST',
+			'header'  => 'Content-type: application/x-www-form-urlencoded',
+			'content' => http_build_query(
+			[
+				'secret' => SITE_CONFIG["keys"]["captcha"]["secret"],
+				'response' => $_POST['g-recaptcha-response'] ?? "",
+				'remoteip' => GetIPAddress()
+			])
+	    ]
+	]);
+
+	$response = file_get_contents('https://www.google.com/recaptcha/api/siteverify', false, $context);
+	$result = json_decode($response);
+
+	if ($result === false || !$result->success) return false;
+	return true;
+}
+
+// DEPRECATED: use GetReadableTime() instead
 function timeSince($datetime, $full = false, $ending = true, $truncate = false, $abbreviate = false) 
 {
 	if(strpos($datetime, '@') === false) $datetime = "@$datetime";
@@ -194,298 +210,85 @@ function timeSince($datetime, $full = false, $ending = true, $truncate = false, 
 	return implode(', ', $string);
 }
 
-class system
-{
-	static function getFileSize($bytes, $binaryPrefix = true) 
+// https://stackoverflow.com/questions/1416697/converting-timestamp-to-time-ago-in-php-e-g-1-day-ago-2-days-ago
+// btw when you use this be sure to put the regular date format as a title or tooltip attribute
+function GetReadableTime($Timestamp, $Options = []) 
+{   
+	$Timestamp += 1;
+
+    $RelativeTime = $Options["RelativeTime"] ?? false;
+    $Full = $Options["Full"] ?? false;
+    $Ending = $Options["Ending"] ?? true;
+    $Abbreviate = $Options["Abbreviate"] ?? false;
+    $Threshold = $Options["Threshold"] ?? false;
+    
+    if($RelativeTime !== false)
+    {
+    	$Full = true;
+    	$Ending = false;
+    	$Timestamp = ($Timestamp+strtotime($RelativeTime, 0));
+    }
+
+	if($Threshold !== false && $Timestamp < strtotime($Threshold, time())) 
 	{
-	    $unit=array('B','KB','MB','GB','TB','PB');
-	    if (!$bytes) return '0 ' . $unit[0];
-	    if ($binaryPrefix) return round($bytes/pow(1024,($i=floor(log($bytes,1024)))),2) .' '. ($unit[$i] ?? 'B');
-	    return round($bytes/pow(1000,($i=floor(log($bytes,1000)))),2) .' '. ($unit[$i] ?? 'B');
+		return date("j/n/Y g:i:s A", $Timestamp);
 	}
+	
+	
+	$TimeNow = new DateTime;
+	$TimeAgo = new DateTime("@$Timestamp");
+	$TimeDifference = $TimeNow->diff($TimeAgo);
 
-	static function getFolderSize($path, $raw = false)
+	$TimeDifference->w = floor($TimeDifference->d / 7);
+	$TimeDifference->d -= $TimeDifference->w * 7;
+
+	if($Abbreviate) 
 	{
-		$io = popen("du -sb $path", "r");
-		$size = (int)filter_var(explode($path, fgets($io, 4096), 2)[0], FILTER_SANITIZE_NUMBER_INT);
-		pclose($io);
-
-		if($raw) return $size;
-		return self::getFileSize($size);
-	}
-
-	static function getMemoryUsage() 
-	{
-		$lines = explode("\n", file_get_contents('/proc/meminfo'));
-		$total = (int) filter_var($lines[0], FILTER_SANITIZE_NUMBER_INT);
-		$free = (int) filter_var($lines[1], FILTER_SANITIZE_NUMBER_INT);
-	       return (object)["total" => $total*1024, "free" => $free*1024];
-	}
-}
-
-class db
-{
-	static function run($sql, $params = false)
-	{
-		global $pdo;
-		if(!$params) return $pdo->query($sql);
-		
-		$query = $pdo->prepare($sql);
-		$query->execute($params);
-		return $query;
-	}
-}
-
-class auth
-{
-	// i wonder if its worth putting the plain password only in the constructor 
-	// for the sake of efficiency - usually it works out well, however in the 
-	// change password api you end up having to instantiate two auth objects
-	// oh well
-	// by the way, this is like the only OOP thing in the entirety of polygon
-	// (apart from third party libaries). maybe i should change that. todo?
-
-	private $plaintext = "";
-	private $key = "";
-
-	function createPassword()
-	{
-		return \ParagonIE\PasswordLock\PasswordLock::hashAndEncrypt($this->plaintext, $this->key);
-	}
-
-	function verifyPassword($storedtext)
-	{
-		if(strpos($storedtext, "$2y$10") !== false)  //standard bcrypt - used since 04/09/2020
-			return password_verify($this->plaintext, $storedtext);
-		elseif(strpos($storedtext, "def50200") !== false) //argon2id w/ encryption - used since 26/02/2021
-			return \ParagonIE\PasswordLock\PasswordLock::decryptAndVerify($this->plaintext, $storedtext, $this->key);
-	}
-
-	function updatePassword($userId)
-	{
-		$pwhash = $this->createPassword();
-		db::run("UPDATE users SET password = :hash, lastpwdchange = UNIX_TIMESTAMP() WHERE id = :id", [":hash" => $pwhash, ":id" => $userId]);
-	}
-
-	function __construct($plaintext)
-	{
-		if(!class_exists('Defuse\Crypto\Key')) polygon::importLibrary("PasswordLock");
-		$this->plaintext = $plaintext;
-		$this->key = \Defuse\Crypto\Key::loadFromAsciiSafeString(SITE_CONFIG["keys"]["passwordEncryption"]);
-	}
-}
-
-class gzip
-{
-	// this is to compress models and places to help conserve space
-	// this should be used only for models and places, nothing else
-
-	//http://stackoverflow.com/questions/6073397/how-do-you-create-a-gz-file-using-php
-	static function compress(string $inFilename, int $level = 9): string
-	{
-		// Is the file gzipped already?
-		$extension = pathinfo($inFilename, PATHINFO_EXTENSION);
-		if ($extension == "gz") { return $inFilename; }
-
-		// Open input file
-		$inFile = fopen($inFilename, "rb");
-		if ($inFile === false) { throw new \Exception("Unable to open input file: $inFilename"); }
-
-		// Open output file
-		$gzFilename = $inFilename.".gz";
-		$gzFile = gzopen($gzFilename, "wb".$level);
-		if ($gzFile === false) 
+		$Components = 
+		[
+		    'y' => 'y', 
+		    'm' => 'm', 
+		    'w' => 'w', 
+		    'd' => 'd', 
+		    'h' => 'h', 
+		    'i' => 'm', 
+		    's' => 's'
+		];
+	    	
+		foreach ($Components as $Character => &$String) 
 		{
-			fclose($inFile);
-			throw new \Exception("Unable to open output file: $gzFilename");
+			if ($TimeDifference->$Character) $String = $TimeDifference->$Character . $String;
+			else unset($Components[$Character]);
 		}
-
-		// Stream copy
-		$length = 65536 * 1024; // 512 kB
-		while (!feof($inFile)) { gzwrite($gzFile, fread($inFile, $length)); }
-
-		// Close files
-		fclose($inFile);
-		gzclose($gzFile);
-
-		// Return the new filename
-		//delete original
-		unlink($inFilename);
-		rename($gzFilename, $inFilename);
-		return $gzFilename;
 	}
-
-	static function decompress($filename, $buffer_size = 8192) 
+	else
 	{
-		$buffer = "";
-		$file = gzopen($filename, 'rb');
-		while(!gzeof($file)) { $buffer .= gzread($file, $buffer_size); }
-		gzclose($file);
-		return $buffer;
-	}
-}
+		$Components = 
+		[
+		    'y' => 'year',
+		    'm' => 'month',
+			'w' => 'week',
+			'd' => 'day',
+			'h' => 'hour',
+			'i' => 'minute',
+			's' => 'second',
+		];
 
-class image
-{
-	static function process($handle, $options)
-	{
-		$image = $options["image"] ?? true;
-		$resize = $options["resize"] ?? true;
-		$keepRatio = $options["keepRatio"] ?? false;
-		$scaleX = $options["scaleX"] ?? false;
-		$scaleY = $options["scaleY"] ?? false;
-
-		$handle->file_new_name_ext = "";
-		$handle->file_new_name_body = $options["name"];
-		
-		if($image)
+		foreach ($Components as $Character => &$String) 
 		{
-			$handle->image_convert = "png";
-			$handle->image_resize = $resize;
-			if($resize)
-			{
-				if($keepRatio) $handle->image_ratio_fill = $options["align"];
-				if($scaleX) $handle->image_ratio_x = true; else $handle->image_x = $options["x"];
-				if($scaleY) $handle->image_ratio_y = true; else $handle->image_y = $options["y"];
-			}
+			if ($TimeDifference->$Character) $String = $TimeDifference->$Character . ' ' . $String . ($TimeDifference->$Character > 1 ? 's' : '');
+			else unset($Components[$Character]);
 		}
-
-		if(strlen($options["name"]) && file_exists(ROOT.$options["dir"].$options["name"])) 
-			unlink(ROOT.$options["dir"].$options["name"]);
-
-		$handle->process(ROOT.$options["dir"]);
-		if(!$handle->processed) api::respond(200, false, $handle->error);
 	}
 
-	static function resize($file, $w, $h, $path = false)
-	{
-		list($width, $height) = getimagesize($file);
-	   	$src = imagecreatefrompng($file);
-	   	$dst = imagecreatetruecolor($w, $h);
-	   	imagealphablending($dst, false);
-	   	imagesavealpha($dst, true);
-	   	imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, $width, $height);
+	if (!$Full) $Components = array_slice($Components, 0, 1);
 
-	   	// this resize function is used in conjunction with an imagepng function
-	   	// to resize an existing image and upload - having to do this eve
-	   	if($path) imagepng($dst, $path);
+	$FirstComponent = [join(', ', array_slice($Components, 0, -1))];
+	$LastComponent = array_slice($Components, -1);
+	$ReadableTime = join(' and ', array_filter(array_merge($FirstComponent, $LastComponent), "strlen"));
 
-	   	return $dst;
-	}
-
-	static function merge($dst_im, $src_im, $dst_x, $dst_y, $src_x, $src_y, $src_w, $src_h, $pct)
-	{
-		$cut = imagecreatetruecolor($src_w, $src_h);
-		imagecopy($cut, $dst_im, 0, 0, $dst_x, $dst_y, $src_w, $src_h);
-		imagecopy($cut, $src_im, 0, 0, $src_x, $src_y, $src_w, $src_h);
-		imagecopymerge($dst_im, $cut, $dst_x, $dst_y, 0, 0, $src_w, $src_h, $pct);
-	}
-
-	// pre rendered thumbnails (scripts and audios) are all rendered with the same size
-	// so this just sorta cleans up the whole thing
-	static function renderfromimg($img, $assetID)
-	{
-		image::resize(ROOT."/thumbs/$img.png", 75, 75, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-75x75.png");
-		image::resize(ROOT."/thumbs/$img.png", 100, 100, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-100x100.png");
-		image::resize(ROOT."/thumbs/$img.png", 110, 110, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-110x110.png");
-		image::resize(ROOT."/thumbs/$img.png", 250, 250, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-250x250.png");
-		image::resize(ROOT."/thumbs/$img.png", 352, 352, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-352x352.png");
-		image::resize(ROOT."/thumbs/$img.png", 420, 230, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-420x230.png");
-		image::resize(ROOT."/thumbs/$img.png", 420, 420, SITE_CONFIG['paths']['thumbs_assets']."/$assetID-420x420.png");
-	}
-}
-
-class Thumbnails
-{
-	// this is for use with the new polygon cdn
-
-	// currently this just calculates the sha1 hash 
-	// of the user's current thumbnail on the fly
-
-	// from what ive seen it doesnt affect performance
-	// too much but ideally i would have the hash cached
-	// in the database, but for now this should do fine
-
-	private static string $BaseURL = "https://polygoncdn.pizzaboxer.xyz/";
-
-	private static array $StatusThumbnails = 
-	[
-		"pending-100x100.png" => "0180a01964362301c67cc47344ff34c2041573c0",
-		"pending-110x110.png" => "e3dd8134956391d4b29070f3d4fc8db1a604f160",
-		"pending-250x250.png" => "d2c46fc832fb48e1d24935893124d21f16cb5824",
-		"pending-352x352.png" => "a4ce4cc7e648fba21da9093bcacf1c33c3903ab9",
-		"pending-420x420.png" => "2f4e0764e8ba3946f52e2b727ce5986776a8a0de",
-		"pending-48x48.png" => "4e3da1b2be713426b48ddddbd4ead386aadec461",
-		"pending-75x75.png" => "6ab927863f95d37af1546d31e3bf8b096cc9ed4a",
-		"rendering-100x100.png" => "b67cc4a3d126f29a0c11e7cba3843e6aceadb769",
-		"rendering-110x110.png" => "d059575ffed532648d3dcf6b1429defcc98fc8b1",
-		"rendering-250x250.png" => "9794c31aa3c4779f9cb2c541cedf2c25fa3397fe",
-		"rendering-352x352.png" => "f523775cc3da917e15c3b15e4165fee2562c0ff1",
-		"rendering-420x420.png" => "a9e786b5c339f29f9016d21858bf22c54146855c",
-		"rendering-48x48.png" => "d7a9b5d7044636d3011541634aee43ca4a86ade6",
-		"rendering-75x75.png" => "fa2ec2e53a4d50d9103a6e4370a3299ba5391544",
-		"unapproved-100x100.png" => "ff0c02a0e1c97d53d0fdf43cd71e47902e7efced",
-		"unapproved-110x110.png" => "e794c2baa9450f12b0265d6bffd9fe06be2f7131",
-		"unapproved-250x250.png" => "9b726ab1dad1860ad2ba7aef7bb85c1ce9083a95",
-		"unapproved-352x352.png" => "cd7ebd4a26745f7554bb5fc01830a8fcb06e7c86",
-		"unapproved-420x420.png" => "c7a1e5902fe1d8b500b3a6b70bdac7d4b71d8380",
-		"unapproved-48x48.png" => "f3fba913ef053968f00047426da620451e7b7273",
-		"unapproved-75x75.png" => "9e29c5a7262bdc963f6345a1c4db142c1213e74b"
-	];
-
-	private static function GetCDNLocation($hash)
-	{
-		return self::$BaseURL.$hash.".png";
-	}
-
-	private static function GetStatus($status, $x, $y)
-	{
-		return self::GetCDNLocation(self::$StatusThumbnails["{$status}-{$x}x{$y}.png"]);
-	}
-
-	static function UploadToCDN($filepath)
-	{
-		$hash = sha1_file($filepath);
-		file_put_contents($_SERVER["DOCUMENT_ROOT"]."/../polygoncdn/".$hash.".png", file_get_contents($filepath));
-	}
-
-	static function GetAsset($sqlResult, $x, $y, $force = false)
-	{
-		// for this we need to pass in an sql pdo result
-		// this is so we can check if the asset is under review or disapproved
-		// passing in the sql result here saves us from having to do another query 
-		// if we implement hash caching then we'd also use this for that 
-
-		$assetID = $sqlResult->id;
-		$filepath = SITE_CONFIG['paths']['thumbs_assets']."/{$assetID}-{$x}x{$y}.png";
-		if(!file_exists($filepath)) return self::GetStatus("rendering", $x, $y);
-
-		if($force || $sqlResult->approved == 1) return self::GetCDNLocation(sha1_file($filepath));
-		if($sqlResult->approved == 0) return self::GetStatus("pending", $x, $y);
-		if($sqlResult->approved == 2)  return self::GetStatus("unapproved", $x, $y);
-	}
-
-	static function GetAvatar($avatarID, $x, $y)
-	{
-		$filepath = SITE_CONFIG['paths']['thumbs_avatars']."/{$avatarID}-{$x}x{$y}.png";
-		if(!file_exists($filepath)) return self::GetStatus("rendering", $x, $y);
-		return self::GetCDNLocation(sha1_file($filepath));
-	}
-
-	static function UploadAsset($handle, $assetID, $x, $y, $additionalOptions = [])
-	{
-		$options = ["name" => "{$assetID}-{$x}x{$y}.png", "x" => $x, "y" => $y, "dir" => "/thumbs/assets/"];
-		$options = array_merge($options, $additionalOptions);
-
-		image::process($handle, $options);
-		self::UploadToCDN(SITE_CONFIG['paths']['thumbs_assets']."/{$assetID}-{$x}x{$y}.png");
-	}
-
-	static function UploadAvatar($handle, $avatarID, $x, $y)
-	{
-		image::process($handle, ["name" => "{$avatarID}-{$x}x{$y}.png", "x" => $x, "y" => $y, "dir" => "/thumbs/avatars/"]);
-		self::UploadToCDN(SITE_CONFIG['paths']['thumbs_avatars']."/{$avatarID}-{$x}x{$y}.png");
-	}
+	if ($Ending) return $Components ? "$ReadableTime ago" : "Just now";
+	return $ReadableTime;
 }
 
 class api
@@ -506,6 +309,7 @@ class api
 		$method = $options["method"] ?? "GET";
 		$logged_in = $options["logged_in"] ?? $options["admin"] ?? false;
 		$admin = $options["admin"] ?? false;
+		$api = $options["api"] ?? false;
 		$admin_ratelimit = $options["admin_ratelimit"] ?? false;
 
 		if($admin && (!SESSION || !SESSION["adminLevel"])) pageBuilder::errorCode(404);
@@ -514,6 +318,13 @@ class api
 		if($secure) header("referrer-policy: same-origin");
 		if($method && $_SERVER['REQUEST_METHOD'] !== $method) self::respond(405, false, "Method Not Allowed"); 
 
+		if(isset(SITE_CONFIG["keys"][$api]))
+		{
+			if($method == "POST") $key = $_POST["ApiKey"] ?? false;
+			else $key = $_GET["ApiKey"] ?? false;
+			if(SITE_CONFIG["keys"][$api] !== $key) self::respond(401, false, "Unauthorized");
+		}
+
 		if($logged_in) 
 		{ 
 			if(!SESSION || SESSION["2fa"] && !SESSION["2faVerified"]) self::respond(401, false, "You are not logged in");
@@ -521,214 +332,43 @@ class api
 			if($_SERVER['HTTP_X_POLYGON_CSRF'] != SESSION["csrfToken"]) self::respond(401, false, "Unauthorized");
 		}
 
-		if($admin)
+		if($admin !== false)
 		{
-			if(!SESSION || !SESSION["adminLevel"]) self::respond(403, false, "Forbidden");
+			if(!Users::IsAdmin($admin)) self::respond(403, false, "Forbidden");
+			if(!SESSION["2fa"]) self::respond(403, false, "Your account must have two-factor authentication enabled before you can do any administrative actions");
 			if(!$admin_ratelimit) return;
 
 			$lastAction = db::run("SELECT time FROM stafflogs WHERE adminId = :uid AND time + 2 > UNIX_TIMESTAMP()", [":uid" => SESSION["userId"]]);
-			if($lastAction->rowCount()) self::respond(429, false, "Please wait ".(($lastAction->fetchColumn()+2)-time())." seconds doing another admin action");
+			if($lastAction->rowCount()) self::respond(429, false, "Please wait ".(($lastAction->fetchColumn()+2)-time())." seconds before doing another administrative action");
 		}
 	}
 }
 
-class games
+class Polygon
 {
-	static function getServerInfo($id)
+	public static array $ImportedClasses = ["Polygon"];
+
+	static function ImportClass($Class)
 	{
-		return db::run("
-			SELECT selfhosted_servers.*, 
-			users.username, 
-			users.jointime,
-			(SELECT COUNT(*) FROM client_sessions WHERE ping+35 > UNIX_TIMESTAMP() AND serverID = selfhosted_servers.id AND valid) AS players, 
-			(ping+35 > UNIX_TIMESTAMP()) AS online
-			FROM selfhosted_servers INNER JOIN users ON users.id = hoster WHERE selfhosted_servers.id = :id", [":id" => $id])->fetch(PDO::FETCH_OBJ);
+		if(!file_exists(ROOT."/api/private/components/{$Class}.php")) return false;
+		if(in_array($Class, self::$ImportedClasses)) return false;
+
+		require ROOT."/api/private/components/{$Class}.php";
+		self::$ImportedClasses[] = $Class;
 	}
 
-	static function getPlayersInServer($serverID)
+	static function IsClientBrowser()
 	{
-		return db::run("
-			SELECT users.* FROM selfhosted_servers
-			INNER JOIN client_sessions ON client_sessions.ping+35 > UNIX_TIMESTAMP() AND serverID = selfhosted_servers.id AND valid
-			INNER JOIN users ON users.id = uid 
-			WHERE selfhosted_servers.id = :id GROUP BY client_sessions.uid", [":id" => $serverID]);
-	}
-}
-
-class catalog
-{
-	public static array $types = 
-	[
-		1 => "Image", // (internal use only - this is used for asset images)
-		2 => "T-Shirt",
-		3 => "Audio",
-		4 => "Mesh", // (internal use only)
-		5 => "Lua", // (internal use only - use this for corescripts and linkedtool scripts)
-		6 => "HTML", // (deprecated - dont use)
-		7 => "Text", // (deprecated - dont use)
-		8 => "Hat",
-		9 => "Place", // (unused as of now)
-		10 => "Model",
-		11 => "Shirt",
-		12 => "Pants",
-		13 => "Decal",
-		16 => "Avatar", // (deprecated - dont use)
-		17 => "Head",
-		18 => "Face",
-		19 => "Gear",
-		21 => "Badge" // (unused as of now)
-	];
-
-	static function getTypeByNum($type)
-	{
-		return self::$types[$type] ?? false;
+		return strpos($_SERVER["HTTP_USER_AGENT"], "MSIE 7.0");
 	}
 
-	public static array $gear_attr_display = 
-	[
-		"melee" => ["text_sel" => "Melee", "text_item" => "Melee Weapon", "icon" => "far fa-sword"],
-		"powerup" => ["text_sel" => "Power ups", "text_item" => "Power Up", "icon" => "far fa-arrow-alt-up"],
-		"ranged" => ["text_sel" => "Ranged", "text_item" => "Ranged Weapon", "icon" => "far fa-bow-arrow"],
-		"navigation" => ["text_sel" => "Navigation", "text_item" => "Melee", "icon" => "far fa-compass"],
-		"explosive" => ["text_sel" => "Explosives", "text_item" => "Explosive", "icon" => "far fa-bomb"],
-		"musical" => ["text_sel" => "Musical", "text_item" => "Musical", "icon" => "far fa-music"],
-		"social" => ["text_sel" => "Social", "text_item" => "Social Item", "icon" => "far fa-laugh"],
-		"transport" => ["text_sel" => "Transport", "text_item" => "Personal Transport", "icon" => "far fa-motorcycle"],
-		"building" => ["text_sel" => "Building", "text_item" => "Melee", "icon" => "far fa-hammer"]
-	];
-
-	public static array $gear_attributes = 
-	[
-		"melee" => false,
-		"powerup" => false,
-		"ranged" => false,
-		"navigation" => false,
-		"explosive" => false,
-		"musical" => false,
-		"social" => false,
-		"transport" => false,
-		"building" => false
-	];
-
-	static function parse_gear_attributes()
-	{
-		$gears = self::$gear_attributes;
-		foreach($gears as $gear => $enabled) $gears[$gear] = isset($_POST["gear_$gear"]) && $_POST["gear_$gear"] == "on";
-		self::$gear_attributes = $gears;
-	}
-
-	static function getItemInfo($id)
-	{
-		return db::run(
-			"SELECT assets.*, users.username, 
-			(SELECT COUNT(*) FROM ownedAssets WHERE assetId = assets.id AND userId != assets.creator) AS sales_total, 
-			(SELECT COUNT(*) FROM ownedAssets WHERE assetId = assets.id AND userId != assets.creator AND timestamp > :sda) AS sales_week
-			FROM assets INNER JOIN users ON creator = users.id WHERE assets.id = :id", 
-			[":sda" => strtotime('7 days ago', time()), ":id" => $id])->fetch(PDO::FETCH_OBJ);
-	}
-
-	static function createAsset($options)
-	{
-		global $pdo;
-		$columns = array_keys($options);
-
-		$querystring = "INSERT INTO assets (".implode(", ", $columns).", created, updated) ";
-		array_walk($columns, function(&$value, $_){ $value = ":$value"; });
-		$querystring .= "VALUES (".implode(", ", $columns).", UNIX_TIMESTAMP(), UNIX_TIMESTAMP())";
-
-		$query = $pdo->prepare($querystring);
-		foreach($options as $option => $val) $query->bindParam(":$option", $options[$option], is_numeric($val) ? PDO::PARAM_INT : PDO::PARAM_STR);
-		$query->execute();
-
-		$aid = $pdo->lastInsertId();
-		$uid = $options["creator"] ?? SESSION["userId"];
-
-		db::run("INSERT INTO ownedAssets (assetId, userId, timestamp) VALUES (:aid, :uid, UNIX_TIMESTAMP())", [":aid" => $aid, ":uid" => $uid]);
-
-		return $aid;
-	}
-
-	static function ownsAsset($uid, $aid)
-	{
-		return db::run("SELECT COUNT(*) FROM ownedAssets WHERE assetId = :aid AND userId = :uid", [":aid" => $aid, ":uid" => $uid])->fetchColumn();
-	}
-
-	static function generateGraphicXML($type, $assetID)
-	{
-		$strings = 
-		[
-			"T-Shirt" => ["class" => "ShirtGraphic", "contentName" => "Graphic", "stringName" => "Shirt Graphic"],
-			"Decal" => ["class" => "Decal", "contentName" => "Texture", "stringName" => "Decal"],
-			"Face" => ["class" => "Decal", "contentName" => "Texture", "stringName" => "face"],
-			"Shirt" => ["class" => "Shirt", "contentName" => "ShirtTemplate", "stringName" => "Shirt"],
-			"Pants" => ["class" => "Pants", "contentName" => "PantsTemplate", "stringName" => "Pants"]
-		];
-		ob_start(); ?>
-<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
-  <External>null</External>
-  <External>nil</External>
-  <Item class="<?=$strings[$type]["class"]?>" referent="RBX0">
-    <Properties>
-<?php if($type == "Decal" || $type == "Face") { ?>
-      <token name="Face">5</token>
-      <string name="Name"><?=$strings[$type]["stringName"]?></string>
-      <float name="Shiny">20</float>
-      <float name="Specular">0</float>
-      <Content name="Texture">
-        <url>%ASSETURL%<?=$assetID?></url>
-      </Content>
-<?php } else { ?>
-      <Content name="<?=$strings[$type]["contentName"]?>">
-        <url>%ASSETURL%<?=$assetID?></url>
-      </Content>
-      <string name="Name"><?=$strings[$type]["stringName"]?></string>
-<?php } ?>
-      <bool name="archivable">true</bool>
-    </Properties>
-  </Item>
-</roblox>
-		<?php return ob_get_clean();
-	}
-}
-
-class twofa
-{
-	static function initialize()
-	{
-		require ROOT.'/api/private/vendors/2fa/FixedBitNotation.php'; 
-		require ROOT.'/api/private/vendors/2fa/GoogleQrUrl.php'; 
-		require ROOT.'/api/private/vendors/2fa/GoogleAuthenticatorInterface.php'; 
-		require ROOT.'/api/private/vendors/2fa/GoogleAuthenticator.php'; 
-		return new \Google\Authenticator\GoogleAuthenticator();
-	}
-
-	static function toggle()
-	{
-		if(!SESSION) return false;
-		db::run("UPDATE users SET twofa = :2fa WHERE id = :uid", [":2fa" => !SESSION["2fa"], ":uid" => SESSION["userId"]]);
-	}
-
-	static function generateRecoveryCodes()
-	{
-		if(!SESSION) return false;
-		$codes = str_split(bin2hex(random_bytes(60)), 12);
-		db::run(
-			"UPDATE users SET twofaRecoveryCodes = :json WHERE id = :uid", 
-			[":json" => json_encode(array_fill_keys($codes, true)), ":uid" => SESSION["userId"]]
-		);
-		return $codes;
-	}
-}
-
-class polygon
-{
-	static function canBypass($rule)
+	static function CanBypass($rule)
 	{
 		global $bypassRules;
 		return !in_array($_SERVER['DOCUMENT_URI'], $bypassRules[$rule]);
 	}
 
-	static function filterText($text, $sanitize = true, $highlight = true, $force = false)
+	static function FilterText($text, $sanitize = true, $highlight = true, $force = false)
 	{
 		if($sanitize) $text = htmlspecialchars($text);
 		if(!$force && SESSION && !SESSION["filter"]) return $text;
@@ -740,19 +380,32 @@ class polygon
 		return str_ireplace([], $filtertext, $text);
 	}
 
-    static function replaceVars($string)
+	static function IsFiltered($text)
+	{
+		return self::FilterText($text, false, false, true) !== $text;
+	}
+
+	static function IsExplicitlyFiltered($text)
+	{
+		// how likely would this lead to false positives?
+		$text = preg_replace("#[[:punct:]]#", "", $text);
+		$text = str_replace(" ", "", $text);
+		return str_ireplace([], "", $text) != $text;
+	}
+
+    static function ReplaceVars($string)
     {
     	$string = str_replace("%site_name%", SITE_CONFIG["site"]["name"], $string);
     	$string = str_replace("%site_name_secondary%", SITE_CONFIG["site"]["name_secondary"], $string);
     	return $string;
     }
 
-    static function importLibrary($filename)
+    static function ImportLibrary($filename)
     {
     	require ROOT."/api/private/vendors/$filename.php";
     }
 
-    static function requestRender($type, $assetID)
+    static function RequestRender($type, $assetID)
 	{
 		$pending = db::run(
 			"SELECT COUNT(*) FROM renderqueue WHERE renderType = :type AND assetID = :assetID AND renderStatus IN (0, 1)",
@@ -766,51 +419,45 @@ class polygon
 		);
 	}
 
-	static function getPendingRenders()
+	static function GetPendingRenders()
 	{
 		return db::run("SELECT COUNT(*) FROM renderqueue WHERE renderStatus IN (0, 1)")->fetchColumn();
 	}
 
-	static function getServerPing($id)
+	static function GetServerPing($id)
 	{
 		return db::run("SELECT ping FROM servers WHERE id = :id", [":id" => $id])->fetchColumn();
 	}
 
-	static function fetchAnnouncements()
+	static function GetAnnouncements()
 	{
 		global $announcements;
 		// TODO - make this json-based instead of relying on sql?
 		// should somewhat help with speed n stuff since it doesnt 
 		// have to query the database on every single page load
 		$announcements = db::run("SELECT * FROM announcements WHERE activated ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+		
 		if(!SITE_CONFIG["site"]["thumbserver"]) 
+		{
 			$announcements[] = 
 			[
 				"text" => "Avatar and asset rendering has been temporarily disabled for maintenance", 
 				"textcolor" => "light", 
 				"bgcolor" => "#F76E19"
 			];
-	}
-
-	static function sendKushFeed($payload) 
-	{
-	    // example payload:
-	    // $payload = ["username" => "test", "content" => "test", "avatar_url" => "https://polygon.pizzaboxer.xyz/thumbs/avatar?id=1&x=100&y=100"];
-	    $ch = curl_init();  
-
-	    curl_setopt($ch, CURLOPT_URL, "https://discord.com/api/webhooks/");
-	    curl_setopt($ch, CURLOPT_POST, true);
-	    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['payload_json' => json_encode($payload)]));
-	    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-	    $response = curl_exec($ch);
-	    curl_close($ch);
-	    return $response;
+		}
 	}
 }
 
-class users
+// this itself has become such a huge mess
+// some of the functions here need to be put in rbxclient or session or polygon or even a new class
+class Users
 {
+	const STAFF = 0; // this is not a normal user - just means every admin
+	const STAFF_CATALOG = 3; // catalog manager
+	const STAFF_MODERATOR = 1; // moderator
+	const STAFF_ADMINISTRATOR = 2; // administrator
+
 	// todo - maybe put in a separate json file?
 	static array $brickcolors =
 	[
@@ -827,27 +474,27 @@ class users
 		return array_flip(self::$brickcolors)[$brickcolor] ?? false;
 	}
 
-	static function getUidFromUserName($username)
+	static function GetIDFromName($username)
 	{
 		return db::run("SELECT id FROM users WHERE username = :username", [":username" => $username])->fetchColumn();
 	}
 
-	static function getUserNameFromUid($userId)
+	static function GetNameFromID($userId)
 	{
 		return db::run("SELECT username FROM users WHERE id = :uid", [":uid" => $userId])->fetchColumn();
 	}
 
-	static function getUserInfoFromUserName($username)
+	static function GetInfoFromName($username)
 	{
 		return db::run("SELECT * FROM users WHERE username = :username", [":username" => $username])->fetch(PDO::FETCH_OBJ);
 	}
 
-	static function getUserInfoFromUid($userId)
+	static function GetInfoFromID($userId)
 	{
 		return db::run("SELECT * FROM users WHERE id = :uid", [":uid" => $userId])->fetch(PDO::FETCH_OBJ);
 	}
 
-	static function getCharacterAppearance($userId, $serverId = false, $assetHost = false)
+	static function GetCharacterAppearance($userId, $serverId = false, $assetHost = false)
 	{		
 		// this is a mess
 
@@ -906,7 +553,7 @@ class users
 		return $charapp;
 	}
 
-	static function checkIfFriends($userId1, $userId2, $status = false)
+	static function CheckIfFriends($userId1, $userId2, $status = false)
 	{
 		if($status === false)
 		{
@@ -926,17 +573,17 @@ class users
 		return $query->fetch(PDO::FETCH_OBJ);
 	}
 
-	static function getFriendCount($userId)
+	static function GetFriendCount($userId)
 	{
 		return db::run("SELECT COUNT(*) FROM friends WHERE :uid IN (requesterId, receiverId) AND status = 1", [":uid" => $userId])->fetchColumn();
 	}
 
-	static function getFriendRequestCount($userId)
+	static function GetFriendRequestCount($userId)
 	{
 		return db::run("SELECT COUNT(*) FROM friends WHERE receiverId = :uid AND status = 0", [":uid" => $userId])->fetchColumn();
 	}
 
-	static function getForumPostCount($userId)
+	static function GetForumPostCount($userId)
 	{
 		return db::run("
 			SELECT (SELECT COUNT(*) FROM polygon.forum_threads WHERE author = :id AND NOT deleted) + 
@@ -945,13 +592,11 @@ class users
 		)->fetchColumn();
 	}
 
-	static function updatePing()
+	static function UpdatePing()
 	{
 		// i have never managed to make this work properly
 		// TODO - make this work properly for once
 		if(!SESSION) return false;
-		if(SESSION["userId"] == 1) return false;
-		if(SESSION["userId"] == 2) return false;
 
 		// update currency stipend
 		if(SESSION["nextCurrencyStipend"] <= time())
@@ -974,7 +619,7 @@ class users
 		);
 	}
 
-	static function getOnlineStatus($userId)
+	static function GetOnlineStatus($userId)
 	{
 		// this is also a mess
 		global $pdo;
@@ -996,7 +641,7 @@ class users
 			return 
 			[
 				"online" => true, 
-				"text" => 'Playing <a href="/games/server?ID='.$info->serverID.'">'.polygon::filterText($info->name).'</a>',
+				"text" => 'Playing <a href="/games/server?ID='.$info->serverID.'">'.Polygon::FilterText($info->name).'</a>',
 				"attributes" => ' class="text-danger"'
 			];
 
@@ -1027,129 +672,107 @@ class users
 		return $response;
 	}
 
-	static function getUsersOnline()
+	static function GetUsersOnline()
 	{
 		return db::run("SELECT COUNT(*) FROM users WHERE lastonline+35 > UNIX_TIMESTAMP()")->fetchColumn();
 	}
 
-	static function requireLogin($studio = false)
+	static function RequireLogin($studio = false)
 	{
 		if(!SESSION) die(header("Location: /login?ReturnUrl=".urlencode($_SERVER['REQUEST_URI']).($studio?"&embedded=true":"")));
 	}
 
-	static function requireLoggedOut()
+	static function RequireLoggedOut()
 	{
 		if(SESSION) die(header("Location: /home"));
 	}
 
-	static function requireAdmin($level = 1)
+	static function IsAdmin($level = self::STAFF)
 	{
-		if(!SESSION || SESSION["adminLevel"] < $level) pageBuilder::errorCode(404);
+		if(!SESSION || SESSION["adminLevel"] == 0) return false;
+		if($level === self::STAFF) return true;
+
+		if(gettype($level) == "array")
+		{
+			if(in_array(SESSION["adminLevel"], $level)) return true;
+		}
+		else
+		{
+			if(SESSION["adminLevel"] == $level) return true;
+		}
+
+		return false;
 	}
 
-	static function getUserModeration($userId)
+	static function RequireAdmin($level = self::STAFF)
+	{
+		if(!self::IsAdmin($level)) 
+			pageBuilder::errorCode(404);
+
+		if(!SESSION["2fa"]) 
+			pageBuilder::errorCode(403, [
+				"title" => "2FA is not enabled", 
+				"text" => "Your account must have two-factor authentication enabled before you can do any administrative actions"
+			]);
+	}
+
+	static function GetUserModeration($userId)
 	{
 		return db::run("SELECT * FROM bans WHERE userId = :id AND NOT isDismissed ORDER BY id DESC LIMIT 1", [":id" => $userId])->fetch(PDO::FETCH_OBJ);
 	}
 
-	static function undoUserModeration($userId, $admin = false)
+	static function UndoUserModeration($userId, $admin = false)
 	{
 		if($admin) db::run("UPDATE bans SET isDismissed = 1 WHERE userId = :id AND NOT isDismissed", [":id" => $userId]);
 		else db::run("UPDATE bans SET isDismissed = 1 WHERE userId = :id AND NOT isDismissed AND NOT banType = 3 AND timeEnds < UNIX_TIMESTAMP()", [":id" => $userId]);
 	}
 
-	static function logStaffAction($action)
+	static function LogStaffAction($action)
 	{
 		if(!SESSION || !SESSION["adminLevel"]) return false;
 		db::run("INSERT INTO stafflogs (time, adminId, action) VALUES (UNIX_TIMESTAMP(), :uid, :action)", [":uid" => SESSION["userId"], ":action" => $action]);
 	}
-}
 
-class forum
-{
-	static function getThreadInfo($id)
+	static function GetAlternateAccounts($data)
 	{
-		return db::run("SELECT * FROM forum_threads WHERE id = :id", [":id" => $id])->fetch(PDO::FETCH_OBJ);
-	}
+		$alts = [];
+		$usedIPs = [];
+		$usedIDs = [];
 
-	static function getReplyInfo($id)
-	{
-		return db::run("SELECT * FROM forum_replies WHERE id = :id", [":id" => $id])->fetch(PDO::FETCH_OBJ);
-	}
+		if(is_numeric($data)) // user id
+		{
+			$ips = db::run("SELECT loginIp FROM sessions WHERE userId = :uid GROUP BY loginIp", [":uid" => $data]);
+		}
+		else // ip address
+		{
+			$ips = db::run(
+				"SELECT loginIp FROM sessions 
+				WHERE userId IN (SELECT userId FROM sessions WHERE loginIp = :ip GROUP BY userId) GROUP BY loginIp", 
+				[":ip" => $data]
+			);
+		}
+		
+		while($ip = $ips->fetch(PDO::FETCH_OBJ)) 
+		{
+			if(in_array($ip->loginIp, $usedIPs)) continue;
+			$usedIPs[] = $ip->loginIp;
 
-	static function getThreadReplies($id)
-	{
-		return db::run("SELECT COUNT(*) FROM forum_replies WHERE threadId = :id AND NOT deleted", [":id" => $id])->fetchColumn() ?: "-";
-	}
+			$altsquery = db::run(
+				"SELECT users.username, userId, users.jointime, loginIp FROM sessions 
+				INNER JOIN users ON users.id = userId WHERE loginIp = :ip GROUP BY userId",
+				[":ip" => $ip->loginIp]
+			);
 
-	static function getSubforumInfo($id)
-	{
-		return db::run("SELECT * FROM forum_subforums WHERE id = :id", [":id" => $id])->fetch(PDO::FETCH_OBJ);
-	}
+			while($row = $altsquery->fetch(PDO::FETCH_OBJ)) 
+			{
+				if(in_array($row->userId, $usedIDs)) continue;
+				$usedIDs[] = $row->userId;
 
-	static function getSubforumThreadCount($id, $includeReplies = false)
-	{
-		$threads = db::run("SELECT COUNT(*) FROM forum_threads WHERE subforumid = :id", [":id" => $id])->fetchColumn();
-		if(!$includeReplies) return $threads ?: '-';
+				$alts[] = ["username" => $row->username, "userid" => $row->userId, "created" => $row->jointime, "ip" => $row->loginIp];
+			}
+		}
 
-		$replies = db::run("SELECT COUNT(*) from forum_replies WHERE threadId IN (SELECT id FROM forum_threads WHERE subforumid = :id)", [":id" => $id])->fetchColumn();
-		$total = $threads + $replies;
-
-		return $total ?: '-';
-	}
-}
-
-class pagination
-{
-	// this is ugly and sucks
-	// really this is only for the forums
-	// everything else uses standard next and back pagination
-
-	public static int $page = 1;
-	public static int $pages = 1;
-	public static string $url = '/';
-	public static array $pager = [1 => 1, 2 => 1, 3 => 1];
-
-	public static function initialize()
-	{
-		self::$pager[1] = self::$page-1; self::$pager[2] = self::$page; self::$pager[3] = self::$page+1;
-
-		if(self::$page <= 2){ self::$pager[1] = self::$page; self::$pager[2] = self::$page+1; self::$pager[3] = self::$page+2; }
-		if(self::$page == 1){ self::$pager[1] = self::$page+1; }
-
-		if(self::$page >= self::$pages-1){ self::$pager[1] = self::$pages-3; self::$pager[2] = self::$pages-2; self::$pager[3] = self::$pages-1; }
-		if(self::$page == self::$pages){ self::$pager[1] = self::$pages-1; self::$pager[2] = self::$pages-2; }
-		if(self::$page == self::$pages-1){ self::$pager[1] = self::$pages-2; self::$pager[2] = self::$pages-1; }
-	}
-
-	public static function insert()
-	{
-		if(self::$pages <= 1) return;
-	?>
-<nav>
-	<ul class="pagination justify-content-end mb-0">
-	  	<li class="page-item<?=self::$page<=1?' disabled':''?>">
-			<a class="page-link" <?=self::$page>1?'href="'.self::$url.(self::$page-1).'"':''?>aria-label="Previous">
-				<span aria-hidden="true">&laquo;</span>
-			    <span class="sr-only">Previous</span>
-			</a>
-		</li>
-		<li class="page-item<?=self::$page==1?' active':''?>"><a class="page-link"<?=self::$page!=1?' href="'.self::$url.'1" ':''?>>1</a></li>
-	    <?php if(self::$pages > 2){ if(self::$page > 3){ ?><li class="page-item disabled"><a class="page-link" href="#" tabindex="-1">&hellip;</a></li><?php } ?>
-	    <?php for($i=1; $i<4; $i++){ if(self::$page == $i-1 || self::$pages-self::$page == $i-2) break; ?>
-	    <li class="page-item<?=self::$page==self::$pager[$i]?' active':''?>"><a class="page-link"<?=self::$page!=self::$pager[$i]?' href="'.self::$url.self::$pager[$i].'" ':''?>><?=number_format(self::$pager[$i])?></a></li>
-		<?php } ?>
-	    <?php if(self::$page < self::$pages-2){ ?><li class="page-item disabled"><a class="page-link" href="#" tabindex="-1">&hellip;</a></li><?php } } ?>
-	    <li class="page-item<?=self::$page==self::$pages?' active':''?>"><a class="page-link"<?=self::$page!=self::$pages?' href="'.self::$url.self::$pages.'" ':''?>><?=number_format(self::$pages)?></a></li>
-	    <li class="page-item<?=self::$page>self::$pages?' disabled':''?>">
-			<a class="page-link" <?=self::$page<self::$pages?'href="'.self::$url.(self::$page+1).'"':''?>aria-label="Next">
-				<span aria-hidden="true">&raquo;</span>
-			    <span class="sr-only">Previous</span>
-			</a>
-		</li>
-  	</ul>
-</nav>
-	<?php
+		return $alts;
 	}
 }
 
@@ -1164,7 +787,7 @@ class session
 		db::run(
 			"INSERT INTO sessions (`sessionKey`, `userAgent`, `userId`, `loginIp`, `created`, `lastonline`, `csrf`) 
 			VALUES (:sesskey, :useragent, :userid, :ip, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), :csrf)",
-			[":sesskey" => $sessionkey, ":useragent" => $_SERVER['HTTP_USER_AGENT'], ":userid" => $userId, ":ip" => $_SERVER['REMOTE_ADDR'], ":csrf" => bin2hex(random_bytes(32))]
+			[":sesskey" => $sessionkey, ":useragent" => $_SERVER['HTTP_USER_AGENT'], ":userid" => $userId, ":ip" => GetIPAddress(), ":csrf" => bin2hex(random_bytes(32))]
 		);
 
 		setcookie("polygon_session", $sessionkey, time()+(157700000*3), "/"); //expires in 5 years
@@ -1197,21 +820,38 @@ class session
 	}
 }
 
-class RBX
-{
-	static function cryptGetSignature($data)
-	{
-		openssl_sign($data, $signature, openssl_pkey_get_private("file://".ROOT."/../polygon_private.pem"));
-		return base64_encode($signature);
-	}
+require ROOT.'/api/private/config.php';
 
-	static function cryptSignScript($data, $assetID = false)
-	{
-		if($assetID) $data = "%{$assetID}%\n{$data}";
-		else $data = "\n{$data}";
-		$signedScript = "%" . self::cryptGetSignature($data) . "%{$data}"; 
-		return $signedScript;
-	}
+// errorhandler include
+
+Polygon::ImportClass("ErrorHandler");
+new ErrorHandler();
+
+// parsedown include
+
+Polygon::ImportLibrary("Parsedown");
+$markdown = new Parsedown();
+$markdown->setMarkupEscaped(true);
+$markdown->setBreaksEnabled(true);
+$markdown->setSafeMode(true);
+$markdown->setUrlsLinked(true);
+
+// db include
+
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/components/db.php';
+Polygon::GetAnnouncements();
+
+// pagebuilder include
+
+Polygon::ImportClass("pagebuilder");
+
+if(GetIPAddress() == "76.190.219.176")
+{
+	define("SESSION", false);
+	pageBuilder::buildHeader();
+	echo "<img src=\"https://cdn.discordapp.com/attachments/754743899200684194/880942764672569354/3dgifmaker59323.gif\" width=\"100%\">";
+	pageBuilder::buildFooter();
+	die();
 }
 
 if(isset($_COOKIE['polygon_session']))
@@ -1219,14 +859,14 @@ if(isset($_COOKIE['polygon_session']))
 	$session = session::getSessionData($_COOKIE['polygon_session']);
 	if($session) 
 	{
-		$userInfo = users::getUserInfoFromUid($session->userId);
+		$userInfo = Users::GetInfoFromID($session->userId);
 		define('SESSION', 
 			[
 				"userName" => $userInfo->username, 
 				"userId" => $userInfo->id, 
 				"2fa" => $userInfo->twofa,
 				"2faVerified" => $session->twofaVerified,
-				"friendRequests" => users::getFriendRequestCount($userInfo->id),
+				"friendRequests" => Users::GetFriendRequestCount($userInfo->id),
 				"status" => $userInfo->status,
 				"currency" => $userInfo->currency, 
 				"nextCurrencyStipend" => $userInfo->nextCurrencyStipend,
@@ -1237,12 +877,18 @@ if(isset($_COOKIE['polygon_session']))
 				"userInfo" => (array)$userInfo
 			]);
 
-		if(SESSION["2fa"] && !SESSION["2faVerified"] && polygon::canBypass("2FA"))
+		if(SESSION["2fa"] && !SESSION["2faVerified"] && Polygon::CanBypass("2FA"))
+		{
 			die(header("Location: /login/2fa"));
-		else if(users::getUserModeration(SESSION["userId"]) && polygon::canBypass("Moderation"))
+		}
+		else if(Users::GetUserModeration(SESSION["userId"]) && Polygon::CanBypass("Moderation"))
+		{
 			die(header("Location: /moderation"));
+		}
 		else
-			users::updatePing();
+		{
+			Users::UpdatePing();
+		}
 	}
 	else 
 	{
@@ -1254,5 +900,3 @@ else
 {
 	define('SESSION', false);
 }
-
-//set_exception_handler("polygon_error_handler");

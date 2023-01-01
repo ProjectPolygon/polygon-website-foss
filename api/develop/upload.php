@@ -1,5 +1,8 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Image");
+Polygon::ImportClass("Thumbnails");
+
 api::initialize(["method" => "POST", "logged_in" => true, "secure" => true]);
 
 $userid = SESSION["userId"];
@@ -7,17 +10,17 @@ $file = $_FILES["file"] ?? false;
 $name = $_POST["name"] ?? false;
 $type = $_POST["type"] ?? false;
 
-if(!$file) api::respond(400, false, "You must select a file");
-if(!in_array($file["type"], ["image/png", "image/jpg", "image/jpeg"])) api::respond(400, false, "Must be a .png or .jpg file");
-if(!$name) api::respond(400, false, "You must specify a name");
-if(polygon::filterText($name, false, false, true) != $name) api::respond(400, false, "The name contains inappropriate text");
-if(!in_array($type, [2, 11, 12, 13])) api::respond(400, false, "You can't upload that type of content!");
+if(!$file) api::respond(200, false, "You must select a file");
+if(!in_array($file["type"], ["image/png", "image/jpg", "image/jpeg"])) api::respond(200, false, "Must be a .png or .jpg file");
+if(!$name) api::respond(200, false, "You must specify a name");
+if(Polygon::IsExplicitlyFiltered($name)) api::respond(200, false, "The name contains inappropriate text");
+if(!in_array($type, [2, 11, 12, 13])) api::respond(200, false, "You can't upload that type of content!");
 
 $query = $pdo->prepare("SELECT created FROM assets WHERE creator = :uid ORDER BY id DESC");
 $query->bindParam(":uid", $userid, PDO::PARAM_INT);
 $query->execute();
 $lastCreation = $query->fetchColumn();
-if($lastCreation+30 > time()) api::respond(400, false, "Please wait ".(30-(time()-$lastCreation))." seconds before creating a new asset");
+if($lastCreation+30 > time()) api::respond(200, false, "Please wait ".(30-(time()-$lastCreation))." seconds before creating a new asset");
 
 // tshirts are a bit messy but straightforward:
 // the image asset itself must be 128x128 with the texture resized to preserve aspect ratio
@@ -57,35 +60,35 @@ if($lastCreation+30 > time()) api::respond(400, false, "Please wait ".(30-(time(
 // Decal/Face    |yes (s)|       |yes (s)| yes (s) | yes (s) |         | yes (s) | yes (s) | yes (s) | yes (s) |
 //		         +-------+-------+-------+---------+---------+---------+---------+---------+---------+---------+
 
-polygon::importLibrary("class.upload");
+Polygon::ImportLibrary("class.upload");
 
 $image = new Upload($file);
 if(!$image->uploaded) api::respond(200, false, "Failed to process image - please contact an admin");
 $image->allowed = ['image/png', 'image/jpg', 'image/jpeg'];
 $image->image_convert = 'png';
 
-$imageId = catalog::createAsset(["type" => 1, "creator" => SESSION["userId"], "name" => $name, "description" => catalog::getTypeByNum($type)." Image"]);
+$imageId = Catalog::CreateAsset(["type" => 1, "creator" => SESSION["userId"], "name" => $name, "description" => Catalog::GetTypeByNum($type)." Image"]);
 
 if($type == 2) //tshirt
 {
-	image::process($image, ["name" => "$imageId", "keepRatio" => true, "align" => "T", "x" => 128, "y" => 128, "dir" => "/asset/files/"]);
+	Image::Process($image, ["name" => "$imageId", "keepRatio" => true, "align" => "T", "x" => 128, "y" => 128, "dir" => "/asset/files/"]);
 	Thumbnails::UploadAsset($image, $imageId, 60, 62, ["keepRatio" => true, "align" => "T"]);
 	Thumbnails::UploadAsset($image, $imageId, 420, 420, ["keepRatio" => true, "align" => "T"]);
 
-	$itemId = catalog::createAsset(["type" => 2, "creator" => SESSION["userId"], "name" => $name, "description" => "T-Shirt", "imageID" => $imageId]);
+	$itemId = Catalog::CreateAsset(["type" => 2, "creator" => SESSION["userId"], "name" => $name, "description" => "T-Shirt", "imageID" => $imageId]);
 
-	file_put_contents(SITE_CONFIG['paths']['assets'].$itemId, catalog::generateGraphicXML("T-Shirt", $imageId));
+	file_put_contents(SITE_CONFIG['paths']['assets'].$itemId, Catalog::GenerateGraphicXML("T-Shirt", $imageId));
 
 	//process initial tshirt thumbnail
 	$template = imagecreatefrompng($_SERVER['DOCUMENT_ROOT']."/img/tshirt-template.png");
-	$shirtdecal = image::resize(SITE_CONFIG['paths']['thumbs_assets']."/$imageId-420x420.png", 250, 250);
+	$shirtdecal = Image::Resize(SITE_CONFIG['paths']['thumbs_assets']."/$imageId-420x420.png", 250, 250);
 	imagesavealpha($template, true);
 	imagesavealpha($shirtdecal, true);
-	image::merge($template, $shirtdecal, 85, 85, 0, 0, 250, 250, 100);
+	Image::MergeLayers($template, $shirtdecal, 85, 85, 0, 0, 250, 250, 100);
 
 	imagepng($template, SITE_CONFIG['paths']['thumbs_assets']."/$itemId-420x420.png");
-	image::resize(SITE_CONFIG['paths']['thumbs_assets']."/$itemId-420x420.png", 100, 100, SITE_CONFIG['paths']['thumbs_assets']."/$itemId-100x100.png");
-	image::resize(SITE_CONFIG['paths']['thumbs_assets']."/$itemId-420x420.png", 110, 110, SITE_CONFIG['paths']['thumbs_assets']."/$itemId-110x110.png");
+	Image::Resize(SITE_CONFIG['paths']['thumbs_assets']."/$itemId-420x420.png", 100, 100, SITE_CONFIG['paths']['thumbs_assets']."/$itemId-100x100.png");
+	Image::Resize(SITE_CONFIG['paths']['thumbs_assets']."/$itemId-420x420.png", 110, 110, SITE_CONFIG['paths']['thumbs_assets']."/$itemId-110x110.png");
 
 	Thumbnails::UploadToCDN(SITE_CONFIG['paths']['thumbs_assets']."/$itemId-100x100.png");
 	Thumbnails::UploadToCDN(SITE_CONFIG['paths']['thumbs_assets']."/$itemId-110x110.png");
@@ -93,31 +96,31 @@ if($type == 2) //tshirt
 }
 elseif($type == 11 || $type == 12) //shirt / pants
 {
-	image::process($image, ["name" => "$imageId", "x" => 585, "y" => 559, "dir" => "/asset/files/"]);
+	Image::Process($image, ["name" => "$imageId", "x" => 585, "y" => 559, "dir" => "/asset/files/"]);
 	Thumbnails::UploadAsset($image, $imageId, 60, 62, ["keepRatio" => true, "align" => "C"]);
 	Thumbnails::UploadAsset($image, $imageId, 420, 420, ["keepRatio" => true, "align" => "C"]);
 
-	$itemId = catalog::createAsset(["type" => $type, "creator" => SESSION["userId"], "name" => $name, "description" =>  catalog::getTypeByNum($type), "imageID" => $imageId]);
-	file_put_contents(SITE_CONFIG['paths']['assets'].$itemId, catalog::generateGraphicXML(catalog::getTypeByNum($type), $imageId));
-	polygon::requestRender("Clothing", $itemId);
+	$itemId = Catalog::CreateAsset(["type" => $type, "creator" => SESSION["userId"], "name" => $name, "description" =>  Catalog::GetTypeByNum($type), "imageID" => $imageId]);
+	file_put_contents(SITE_CONFIG['paths']['assets'].$itemId, Catalog::GenerateGraphicXML(Catalog::GetTypeByNum($type), $imageId));
+	Polygon::RequestRender("Clothing", $itemId);
 }
 elseif($type == 13) //decal
 {
-	image::process($image, ["name" => "$imageId", "x" => 256, "scaleY" => true, "dir" => "/asset/files/"]);
+	Image::Process($image, ["name" => "$imageId", "x" => 256, "scaleY" => true, "dir" => "/asset/files/"]);
 	Thumbnails::UploadAsset($image, $imageId, 60, 62, ["keepRatio" => true, "align" => "C"]);
 	Thumbnails::UploadAsset($image, $imageId, 420, 420, ["keepRatio" => true, "align" => "C"]);
 
-	$itemId = catalog::createAsset(["type" => 13, "creator" => SESSION["userId"], "name" => $name, "description" => "Decal", "imageID" => $imageId]);
+	$itemId = Catalog::CreateAsset(["type" => 13, "creator" => SESSION["userId"], "name" => $name, "description" => "Decal", "imageID" => $imageId]);
 
-	file_put_contents(SITE_CONFIG['paths']['assets'].$itemId, catalog::generateGraphicXML("Decal", $imageId));
-	image::process($image, ["name" => "$itemId-48x48.png", "x" => 48, "y" => 48, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-75x75.png", "x" => 75, "y" => 75, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-100x100.png", "x" => 100, "y" => 100, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-110x110.png", "x" => 110, "y" => 110, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-250x250.png", "x" => 250, "y" => 250, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-352x352.png", "x" => 352, "y" => 352, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-420x230.png", "x" => 420, "y" => 230, "dir" => "/thumbs/assets/"]);
-	image::process($image, ["name" => "$itemId-420x420.png", "x" => 420, "y" => 420, "dir" => "/thumbs/assets/"]);
+	file_put_contents(SITE_CONFIG['paths']['assets'].$itemId, Catalog::GenerateGraphicXML("Decal", $imageId));
+	Thumbnails::UploadAsset($image, $itemId, 48, 48);
+	Thumbnails::UploadAsset($image, $itemId, 75, 75);
+	Thumbnails::UploadAsset($image, $itemId, 100, 100);
+	Thumbnails::UploadAsset($image, $itemId, 110, 110);
+	Thumbnails::UploadAsset($image, $itemId, 250, 250);
+	Thumbnails::UploadAsset($image, $itemId, 352, 352);
+	Thumbnails::UploadAsset($image, $itemId, 420, 230);
+	Thumbnails::UploadAsset($image, $itemId, 420, 420);
 }
 
-api::respond_custom(["status" => 200, "success" => true, "message" => catalog::getTypeByNum($type)." successfully created!"]);
+api::respond_custom(["status" => 200, "success" => true, "message" => Catalog::GetTypeByNum($type)." successfully created!"]);

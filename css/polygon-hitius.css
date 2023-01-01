@@ -1,0 +1,20 @@
+.text-center {
+    transform: skewX(47deg);
+}
+.col-lg-6.col-md-8.px-3.divider-right {
+    float: left;
+    transform: scaleX(3);
+}
+.navbar-orange, .nav-item .dropdown-menu {
+    border: 39px groove #fb0;
+        background-color: #fff000 !important;
+}
+* {
+    font-family: fantasy;
+}
+.navbar.navbar-expand-lg.navbar-dark.navbar-top.bg-dark.py-0 {
+    width: 33333px;
+}
+.card-body {
+    height: 455px;
+    tr

@@ -1,6 +1,8 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
-api::initialize(["method" => "POST"]);
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
+
+api::initialize(["method" => "POST", "logged_in" => true]);
 
 $client = $_POST["client"] ?? "false";
 $creator = $_POST["creator"] ?? false;
@@ -40,13 +42,14 @@ while($server = $servers->fetch(PDO::FETCH_OBJ))
 {
 	$gears = [];
 	foreach(json_decode($server->allowed_gears, true) as $gear_attr => $gear_val) 
-		if($gear_val) $gears[] = ["name" => catalog::$gear_attr_display[$gear_attr]["text_sel"], "icon" => catalog::$gear_attr_display[$gear_attr]["icon"]];
+		if($gear_val) $gears[] = ["name" => Catalog::$GearAttributesDisplay[$gear_attr]["text_sel"], "icon" => Catalog::$GearAttributesDisplay[$gear_attr]["icon"]];
 	$items[] = 
 	[
-		"server_name" => polygon::filterText($server->name), 
+		"server_name" => Polygon::FilterText($server->name), 
+		"server_description" => strlen($server->description) ? Polygon::FilterText($server->description) : "No description available.", 
 		"server_id" => $server->id,
 		"server_thumbnail" => Thumbnails::GetAvatar($server->hoster, 420, 420),
-		"hoster_name" => users::getUserNameFromUid($server->hoster), 
+		"hoster_name" => Users::GetNameFromID($server->hoster), 
 		"hoster_id" => $server->hoster,
 		"date" => date('n/d/Y g:i:s A', $server->created),
 		"version" => $server->version,

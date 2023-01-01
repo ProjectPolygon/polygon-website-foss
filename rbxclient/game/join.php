@@ -1,4 +1,5 @@
 <?php require $_SERVER['DOCUMENT_ROOT']."/api/private/core.php";
+Polygon::ImportClass("RBXClient");
 
 header("Pragma: no-cache");
 header("Cache-Control: no-cache");
@@ -10,14 +11,14 @@ $params = (object)
 
 	"membership" => "None",
 	"age" => 0,
-	"charappUrl" => "",
+	"charappUrl" => "http://{$_SERVER['HTTP_HOST']}/Asset/CharacterFetch.ashx?userId=2",
 	"pingUrl" => "",
 	"uploadUrl" => ""
 ];
 
 if(SESSION)
 {
-	$params->charappUrl = "http://{$_SERVER['HTTP_HOST']}/asset/characterfetch?userId=".SESSION['userId'];
+	$params->charappUrl = "http://{$_SERVER['HTTP_HOST']}/Asset/CharacterFetch.ashx?userId=".SESSION['userId'];
 	if(SESSION["adminLevel"]) $params->membership = "OutrageousBuildersClub";
 }
 
@@ -247,4 +248,4 @@ pcall(function() game:SetScreenshotInfo("") end)
 pcall(function() game:SetVideoInfo('<?xml version="1.0"?><entry xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xmlns:yt="http://gdata.youtube.com/schemas/2007"><media:group><media:title type="plain"><![CDATA[ROBLOX Place]]></media:title><media:description type="plain"><![CDATA[ For more games visit http://<?=$_SERVER['HTTP_HOST']?>]]></media:description><media:category scheme="http://gdata.youtube.com/schemas/2007/categories.cat">Games</media:category><media:keywords>ROBLOX, video, free game, online virtual world</media:keywords></media:group></entry>') end)
 -- use single quotes here because the video info string may have unescaped double quotes
 
-<?php echo RBX::cryptSignScript(ob_get_clean());
+<?php echo RBXClient::CryptSignScript(ob_get_clean());

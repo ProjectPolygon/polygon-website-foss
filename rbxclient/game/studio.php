@@ -1,4 +1,5 @@
 <?php require $_SERVER['DOCUMENT_ROOT']."/api/private/core.php";
+Polygon::ImportClass("RBXClient");
 
 header("Pragma: no-cache");
 header("Cache-Control: no-cache");
@@ -35,4 +36,4 @@ if not result then
 end
 
 -- loadfile("http://chef.pizzaboxer.xyz/game/visit.ashx")()
-<?php echo RBX::cryptSignScript(ob_get_clean());
+<?php echo RBXClient::CryptSignScript(ob_get_clean());

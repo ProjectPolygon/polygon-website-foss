@@ -1,7 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-if(!SESSION || SESSION && !SESSION["adminLevel"]){ pageBuilder::errorCode(404); }
-
+Users::RequireAdmin([Users::STAFF_MODERATOR, Users::STAFF_ADMINISTRATOR]);
 $query = $pdo->query("SELECT * FROM bans ORDER BY id DESC");
 
 pageBuilder::$CSSdependencies[] = "/css/bootstrap-datepicker.min.css";
@@ -111,13 +110,13 @@ pageBuilder::buildHeader();
                 <?=date('j/n/Y', $row->timeStarted)?>
               </td>
               <td>
-                <a href="/user?ID=<?=$row->userId?>"><?=users::getUserNameFromUid($row->userId)?></a>
+                <a href="/user?ID=<?=$row->userId?>"><?=Users::GetNameFromID($row->userId)?></a>
               </td>
               <td>
                 <?=[1=>"Warning", 2=>"Ban", 3=>"Permanent ban"][$row->banType]?>
               </td>
               <td>
-                <a href="/user?ID=<?=$row->userId?>"><?=users::getUserNameFromUid($row->bannerId)?></a>
+                <a href="/user?ID=<?=$row->userId?>"><?=Users::GetNameFromID($row->bannerId)?></a>
               </td>
               <td title="<?=$row->banType == 2 ? date('j/n/Y g:i:s A \G\M\T', $row->timeEnds) : 'Not Applicable'?>">
                 <?=$row->banType == 2 ? date('j/n/Y', $row->timeEnds) : "N/A"?>
@@ -126,11 +125,11 @@ pageBuilder::buildHeader();
                 <?=$row->isDismissed?"Yes":"No"?>
               </td>
               <td>
-                <button class="btn btn-outline-primary" data-title="Ban reason for <?=users::getUserNameFromUid($row->userId)?>" data-text="<?=htmlspecialchars($row->reason)?>" data-control="openModal">View</button>
+                <button class="btn btn-outline-primary" data-title="Ban reason for <?=Users::GetNameFromID($row->userId)?>" data-text="<?=htmlspecialchars($row->reason)?>" data-control="openModal">View</button>
               </td>
               <td>
                 <?php if($row->note){ ?>
-                  <button class="btn btn-outline-primary" data-title="Staff note for <?=users::getUserNameFromUid($row->userId)?>" data-text="<?=htmlspecialchars($row->note)?>" data-control="openModal">View</button> 
+                  <button class="btn btn-outline-primary" data-title="Staff note for <?=Users::GetNameFromID($row->userId)?>" data-text="<?=htmlspecialchars($row->note)?>" data-control="openModal">View</button> 
                 <?php } else { echo "N/A"; } ?>
               </td>
             </tr>

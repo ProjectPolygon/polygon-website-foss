@@ -19,12 +19,15 @@ $params = (object)
 	"username" => "Player",
 	"userid" => 0,
 	"membership" => "None",
+	"safechat" => "false",
 	"age" => 0,
 	"charappUrl" => "",
 	"pingUrl" => "",
 	"uploadUrl" => "",
 	"ticket" => "",
-	"debugging" => false
+	"debugging" => false,
+
+	"chatstyle" => "ClassicAndBubble"
 ];
 
 $params->serverPort = 
@@ -56,17 +59,29 @@ if(isset($_GET['ticket']))
 		$params->pbs = $sessionInfo->pbs;
 		$params->teleport = $sessionInfo->isTeleport;
 
-		$userInfo = users::getUserInfoFromUid($sessionInfo->uid);
+		$userInfo = Users::GetInfoFromID($sessionInfo->uid);
 		$params->username = $userInfo->username;
 		$params->userid = $userInfo->id;
 		$params->debugging = $userInfo->debugging;
 		$params->ticket = $sessionInfo->securityTicket;
-		$params->pingUrl = "http://chef.pizzaboxer.xyz/game/clientpresence?ticket=".$_GET['ticket'];
-		$params->charappUrl = $params->version == 2009 ? users::getCharacterAppearance($params->userid, $params->serverID) : "http://chef.pizzaboxer.xyz/asset/characterfetch?userId=".$params->userid."&serverId=".$params->serverID;
-		if($userInfo->adminlevel == 2) 
+		$params->pingUrl = "http://{$_SERVER['HTTP_HOST']}/game/clientpresence?ticket={$_GET['ticket']}";
+		$params->charappUrl = $params->version == 2009 ? Users::GetCharacterAppearance($params->userid, $params->serverID) : "http://{$_SERVER['HTTP_HOST']}/Asset/CharacterFetch.ashx?userId={$params->userid}&serverId={$params->serverID}";
+
+		if($userInfo->adminlevel != 0) 
 		{ 
 			$params->membership = "OutrageousBuildersClub"; 
 			//$params->pbs = true; 
+		}
+		else if($userInfo->id < 100)
+		{
+			$params->membership = "TurboBuildersClub";
+		}
+
+		// no gui
+		if($userInfo->username == "ThumbnailGenerator")
+		{
+			$params->chatstyle = "Classic";
+			$params->safechat = "true";
 		}
 
 		// this cookie is used for teleportservice to identify the player
@@ -106,6 +121,9 @@ function onPlayerAdded(player)
 			end
 	 	end)
 	end
+	<?php if($params->chatstyle == "Classic") { ?>
+	for _,v in pairs(game.GuiRoot:GetChildren()) do v:Remove() end
+	<?php } ?>
 end
 
 -- MultiplayerSharedScript.lua inserted here ------ Prepended to Join.lua --
@@ -136,7 +154,7 @@ pcall(function() game:GetService("ContentProvider"):SetThreadPool(16) end)
 pcall(function() game:GetService("InsertService"):SetBaseSetsUrl("http://<?=$_SERVER['HTTP_HOST']?>/Game/Tools/InsertAsset.ashx?nsets=10&type=base") end)
 pcall(function() game:GetService("InsertService"):SetUserSetsUrl("http://<?=$_SERVER['HTTP_HOST']?>/Game/Tools/InsertAsset.ashx?nsets=20&type=user&userid=%d&t=2") end)
 pcall(function() game:GetService("InsertService"):SetCollectionUrl("http://<?=$_SERVER['HTTP_HOST']?>/Game/Tools/InsertAsset.ashx?sid=%d") end)
-pcall(function() game:GetService("InsertService"):SetAssetUrl("http://chef.pizzaboxer.xyz/Asset/?id=%d") end)
+pcall(function() game:GetService("InsertService"):SetAssetUrl("http://<?=$_SERVER['HTTP_HOST']?>/Asset/?id=%d") end)
 
 pcall(function() game:GetService("SocialService"):SetFriendUrl("http://<?=$_SERVER['HTTP_HOST']?>/Game/LuaWebService/HandleSocialRequest.ashx?method=IsFriendsWith&playerid=%d&userid=%d") end)
 pcall(function() game:GetService("SocialService"):SetBestFriendUrl("http://<?=$_SERVER['HTTP_HOST']?>/Game/LuaWebService/HandleSocialRequest.ashx?method=IsBestFriendsWith&playerid=%d&userid=%d") end)
@@ -145,7 +163,7 @@ pcall(function() game:GetService("SocialService"):SetGroupRankUrl("http://<?=$_S
 pcall(function() game:GetService("SocialService"):SetGroupRoleUrl("http://<?=$_SERVER['HTTP_HOST']?>/Game/LuaWebService/HandleSocialRequest.ashx?method=GetGroupRole&playerid=%d&groupid=%d") end)
 
 -- Bubble chat.  This is all-encapsulated to allow us to turn it off with a config setting
-pcall(function() game:GetService("Players"):SetChatStyle(Enum.ChatStyle.ClassicAndBubble) end)
+pcall(function() game:GetService("Players"):SetChatStyle(Enum.ChatStyle.<?=$params->chatstyle?>) end)
 
 local waitingForCharacter = false
 pcall( function()
@@ -325,7 +343,7 @@ local success, err = pcall(function()
 		<?php } ?> 
 	end
 
-	player:SetSuperSafeChat(false)
+	player:SetSuperSafeChat(<?=$params->safechat?>)
 	pcall(function() player:SetMembershipType(Enum.MembershipType.<?=$params->membership?>) end)
 	pcall(function() player:SetAccountAge(0) end)
 	player.Idled:connect(onPlayerIdled)

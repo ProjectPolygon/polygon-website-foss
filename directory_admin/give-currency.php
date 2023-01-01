@@ -1,6 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-if(!SESSION || SESSION && SESSION["userId"] != 1){ pageBuilder::errorCode(404); }
+Users::RequireAdmin(Users::STAFF_ADMINISTRATOR);
 
 pageBuilder::$pageConfig["title"] = "Give ".SITE_CONFIG["site"]["currency"];
 pageBuilder::buildHeader();

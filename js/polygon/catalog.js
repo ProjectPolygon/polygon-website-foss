@@ -48,6 +48,8 @@ $(".pagination .page").on("focusout keypress", this, function(event)
 	polygon.catalog.PageNumber = $(this).val(); polygon.catalog.show();
 });
 
+$(function(){ polygon.registerHandlers("catalog"); });
+
 /*$(".items .item").hover(
 	function(){ $(this).find(".details").removeClass("d-none"); }, 
 	function(){ $(this).find(".details").addClass("d-none"); });*/

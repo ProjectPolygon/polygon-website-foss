@@ -1,14 +1,15 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Catalog");
+
+Users::RequireLogin();
 
 $serverID = $_GET['ID'] ?? $_GET['id'] ?? false;
 $query = $pdo->prepare("SELECT * FROM selfhosted_servers WHERE id = :id");
 $query->bindParam(":id", $serverID, PDO::PARAM_INT);
 $query->execute();
 $server = $query->fetch(PDO::FETCH_OBJ);
-if(!$server || !SESSION["adminLevel"] && $server->hoster != SESSION["userId"]) pageBuilder::errorCode(404);
-catalog::$gear_attributes = json_decode($server->allowed_gears, true);
+if(!$server || !Users::IsAdmin(Users::STAFF_ADMINISTRATOR) && $server->hoster != SESSION["userId"]) pageBuilder::errorCode(404);
+Catalog::$GearAttributes = json_decode($server->allowed_gears, true);
 
 $alert = false;
 
@@ -31,24 +32,18 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 	$version = $_POST["version"] ?? false;
 	$maxplayers = $_POST["maxplayers"] ?? false;
 	$pbs = in_array($version, ["2011", "2012"]) && isset($_POST["pbs"]) && $_POST["pbs"] == "on";
-	catalog::parse_gear_attributes();
+	Catalog::ParseGearAttributes();
 
-	if(!strlen($name)) 
-		$alert = ["text" => "Server name cannot be empty", "color" => "danger"];
-	elseif(strlen($name) > 50) 
-		$alert = ["text" => "Server name cannot be longer than 50 characters", "color" => "danger"];
-	elseif(strlen($description) > 1000) 
-		$alert = ["text" => "Server description cannot be longer than 1000 characters", "color" => "danger"];
-	elseif(!strlen($ip)) 
-		$alert = ["text" => "IP address cannot be empty", "color" => "danger"];
-	elseif(!filter_var($ip, FILTER_VALIDATE_IP)) 
-		$alert = ["text" => "Invalid IP address", "color" => "danger"];
-	elseif(!is_numeric($port) || $port < 1 || $port > 65536)
-		{ $alert = ["text" => "Invalid port", "color" => "danger"]; $port = false; }
-	elseif(!in_array($version, ["2009", "2010", "2011", "2012"])) 
-		$alert = ["text" => "Invalid version", "color" => "danger"];
-	elseif(!is_numeric($maxplayers) || $maxplayers < 1 || $maxplayers > 2147483648)
-		{ $alert = ["text" => "Invalid maximum player count", "color" => "danger"]; $maxplayers = false; }
+	if(empty($name)) $alert = ["text" => "Server name cannot be empty", "color" => "danger"];
+	else if(strlen($name) > 50) $alert = ["text" => "Server name cannot be longer than 50 characters", "color" => "danger"];
+	else if(strlen($description) > 1000) $alert = ["text" => "Server description cannot be longer than 1000 characters", "color" => "danger"];
+	else if(Polygon::IsExplicitlyFiltered($name)) $alert = ["text" => "The name contains inappropriate text", "color" => "danger"];
+	else if(Polygon::IsExplicitlyFiltered($description)) $alert = ["text" => "The description contains inappropriate text", "color" => "danger"];
+	else if(empty($ip)) $alert = ["text" => "IP address cannot be empty", "color" => "danger"];
+	else if(!filter_var($ip, FILTER_VALIDATE_IP)) $alert = ["text" => "Invalid IP address", "color" => "danger"];
+	else if(!is_numeric($port) || $port < 1 || $port > 65536) { $alert = ["text" => "Invalid port", "color" => "danger"]; $port = false; }
+	else if(!in_array($version, ["2009", "2010", "2011", "2012"])) $alert = ["text" => "Invalid version", "color" => "danger"];
+	else if(!is_numeric($maxplayers) || $maxplayers < 1 || $maxplayers > 2147483648) { $alert = ["text" => "Invalid maximum player count", "color" => "danger"]; $maxplayers = false; }
 	else
 	{
 		$server->name = $name;
@@ -57,7 +52,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 		$server->port = $port;
 		$server->version = $version;
 		$server->maxplayers = $maxplayers;
-		$server->allowed_gears = json_encode(catalog::$gear_attributes);
+		$server->allowed_gears = json_encode(Catalog::$GearAttributes);
 		$server->pbs = $pbs;
 		
 		$query = $pdo->prepare("UPDATE selfhosted_servers SET name = :name, description = :desc, ip = :ip, port = :port, version = :version, maxplayers = :players, allowed_gears = :gears, pbs = :pbs WHERE id = :id");
@@ -94,7 +89,7 @@ pageBuilder::buildHeader();
 		</div>
 		<div class="row">
 			<div class="col-sm-6 form-group">
-			  	<span><label for="name" class="mb-0">IP Address:</label> <a href="#" class="float-right" onclick="$('#ip').val('<?=$_SERVER['REMOTE_ADDR']?>')">Use current address</a></span>
+			  	<span><label for="name" class="mb-0">IP Address:</label> <a href="#" class="float-right" onclick="$('#ip').val('<?=GetIPAddress()?>')">Use current address</a></span>
 			    <input type="text" class="form-control form-control-sm" name="ip" id="ip" tabindex="3" placeholder="Server IP Address"<?=$server->ip?' value="'.htmlspecialchars($server->ip).'"':''?>>
 			</div>
 			<div class="col-sm-6 form-group">
@@ -129,55 +124,55 @@ pageBuilder::buildHeader();
 					<div class="row">
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_melee" name="gear_melee"<?=catalog::$gear_attributes["melee"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_melee" name="gear_melee"<?=Catalog::$GearAttributes["melee"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_melee">Melee</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_powerup" name="gear_powerup"<?=catalog::$gear_attributes["powerup"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_powerup" name="gear_powerup"<?=Catalog::$GearAttributes["powerup"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_powerup">Power ups</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_ranged" name="gear_ranged"<?=catalog::$gear_attributes["ranged"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_ranged" name="gear_ranged"<?=Catalog::$GearAttributes["ranged"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_ranged">Ranged</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_navigation" name="gear_navigation"<?=catalog::$gear_attributes["navigation"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_navigation" name="gear_navigation"<?=Catalog::$GearAttributes["navigation"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_navigation">Navigation</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_explosive" name="gear_explosive"<?=catalog::$gear_attributes["explosive"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_explosive" name="gear_explosive"<?=Catalog::$GearAttributes["explosive"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_explosive">Explosives</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_musical" name="gear_musical"<?=catalog::$gear_attributes["musical"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_musical" name="gear_musical"<?=Catalog::$GearAttributes["musical"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_musical">Musical</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_social" name="gear_social"<?=catalog::$gear_attributes["social"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_social" name="gear_social"<?=Catalog::$GearAttributes["social"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_social">Social</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_transport" name="gear_transport"<?=catalog::$gear_attributes["transport"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_transport" name="gear_transport"<?=Catalog::$GearAttributes["transport"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_transport">Transport</label>
 							</div>
 						</div>
 						<div class="col-sm-4">
 							<div class="form-check">
-							    <input type="checkbox" class="form-check-input" id="gear_building" name="gear_building"<?=catalog::$gear_attributes["building"]?' checked="checked"':''?>>
+							    <input type="checkbox" class="form-check-input" id="gear_building" name="gear_building"<?=Catalog::$GearAttributes["building"]?' checked="checked"':''?>>
 							    <label class="form-check-label" for="gear_building">Building</label>
 							</div>
 						</div>

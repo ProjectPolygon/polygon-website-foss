@@ -1,19 +1,34 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Gzip");
+Polygon::ImportClass("RBXClient");
 
 header("Cache-Control: max-age=120");
 
-$id = $_GET['ID'] ?? $_GET['id'] ?? false;
-$assetHost = $_GET['host'] ?? $_SERVER['HTTP_HOST'];
-$force = isset($_GET['force']);
-$rblxasset = false;
+$ExemptIDs = 
+[
+	69281057, // stamper speaker
+	69281292, // stamper boombox
+];
 
-$query = $pdo->prepare("SELECT * FROM assets WHERE id = :id");
-$query->bindParam(":id", $id, PDO::PARAM_INT);
-$query->execute();
-$asset = $query->fetch(PDO::FETCH_OBJ);
+$SwapIDs = 
+[
+	60059129 => 2599, // stamper rock
+	60051616 => 2600, // stamper funk
+	60049010 => 2601, // stamper electronic
+];
 
-if(!$asset || isset($_GET['forcerblxasset'])) $rblxasset = true;
+$AssetID = $_GET['ID'] ?? $_GET['id'] ?? false;
+$AssetHost = $_GET['host'] ?? $_SERVER['HTTP_HOST'];
+
+$ForceRequest = isset($_GET['force']);
+$RobloxAsset = false;
+
+$AssetID = $SwapIDs[$AssetID] ?? $AssetID;
+
+$Asset = db::run("SELECT * FROM assets WHERE id = :id", [":id" => $AssetID])->fetch(PDO::FETCH_OBJ);
+
+if(!$Asset || isset($_GET['forcerblxasset'])) $RobloxAsset = true;
 
 // so i dont have a url redirect in the client just yet
 // meaning that we're gonna have to replace the roblox.com urls on the fly
@@ -21,61 +36,79 @@ if(!$asset || isset($_GET['forcerblxasset'])) $rblxasset = true;
 // this is absolutely gonna tank performance but for the meantime theres
 // not much else i can do
 
-if($rblxasset) 
+if($RobloxAsset) 
 {
 	// we're only interested in replacing the asset urls of models
-	$apidata = json_decode(file_get_contents("https://api.roblox.com/marketplace/productinfo?assetId=".$_GET['id']));
-	if(!in_array($apidata->AssetTypeId, [9, 10])) die(header("Location: https://assetdelivery.roblox.com/v1/asset/?".$_SERVER['QUERY_STRING']));
+	// $apidata = json_decode(file_get_contents("https://api.roblox.com/marketplace/productinfo?assetId=".$_GET['id']));
+	// if(!in_array($apidata->AssetTypeId, [9, 10])) die(header("Location: https://assetdelivery.roblox.com/v1/asset/?".$_SERVER['QUERY_STRING']));
 
 	// /asset/?id= just redirects to a url on roblox's cdn so we need to get that redirect url 
-	$ch = curl_init();
-	curl_setopt_array($ch, [CURLOPT_URL => "https://assetdelivery.roblox.com/v1/asset/?".$_SERVER['QUERY_STRING'], CURLOPT_RETURNTRANSFER => true, CURLOPT_SSL_VERIFYHOST => false, CURLOPT_SSL_VERIFYPEER => false]);
-	$response = curl_exec($ch);
-	$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-	if($httpcode != 302) die(http_response_code($httpcode));
-	$assetData = file_get_contents(curl_getinfo($ch, CURLINFO_REDIRECT_URL));
+	$curl = curl_init();
+	curl_setopt_array($curl, 
+	[
+		CURLOPT_URL => "https://assetdelivery.roblox.com/v1/asset/?".$_SERVER['QUERY_STRING'], 
+		CURLOPT_RETURNTRANSFER => true, 
+		CURLOPT_FOLLOWLOCATION => true,
+		CURLOPT_HTTPHEADER => ["User-Agent: Roblox/WinInet"]
+	]);
+
+	$AssetData = curl_exec($curl);
+	$HttpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+	if($HttpCode != 200) die(http_response_code($HttpCode));
+	if(!stripos($AssetData, 'roblox')) die(header("Location: https://assetdelivery.roblox.com/v1/asset/?".$_SERVER['QUERY_STRING']));
 }
 else
 {
-	if(!$force && $asset->approved != 1) die(http_response_code(403));
-	if(!$force && !$asset->publicDomain && (!SESSION || SESSION["userId"] != $asset->creator)) die(http_response_code(403));
-	if(!file_exists("./files/$id")) die(http_response_code(404));
+	if(!file_exists("./files/".$Asset->id)) die(http_response_code(404));
 
-	$assetData = file_get_contents("./files/".$asset->id);
-	if($asset->type == 10 && !stripos($assetData, 'roblox')) $assetData = gzip::decompress("./files/".$asset->id);
+	if(!$ForceRequest)
+	{
+		if($Asset->approved != 1) die(http_response_code(403));
+		if(!$Asset->publicDomain && (!SESSION || !Catalog::OwnsAsset(SESSION["userId"], $Asset->id))) die(http_response_code(403));
+	}
+
+	$AssetData = file_get_contents("./files/".$Asset->id);
+	if($Asset->type == 10 && !stripos($AssetData, 'roblox')) $AssetData = Gzip::Decompress("./files/".$Asset->id);
 }
 
 // replace asset urls
-if($force) $assetData = preg_replace("/%ASSETURL%([0-9]+)/i", "http://$assetHost/asset/?id=$1&force=true", $assetData);
-else $assetData = str_replace("%ASSETURL%", "http://$assetHost/asset/?id=", $assetData);
+if($ForceRequest) $AssetData = preg_replace("/%ASSETURL%([0-9]+)/i", "http://$AssetHost/asset/?id=$1&force=true", $AssetData);
+else $AssetData = str_replace("%ASSETURL%", "http://$AssetHost/asset/?id=", $AssetData);
 
-$assetData = str_ireplace(
-	["www.roblox.com/asset", "roblox.com/asset", "www.roblox.com/thumbs", "roblox.com/thumbs"], 
-	["$assetHost/asset", "$assetHost/asset", "$assetHost/thumbs", "$assetHost/thumbs"], 
-	$assetData);
-
-if(!$rblxasset && $asset->type == 3 && isset($_GET['audiostream']))
+// we need to make an exception for the stamper tool speaker as it needs to be able to load polygon assets
+if($RobloxAsset && !in_array($AssetID, $ExemptIDs))
 {
-	header('Content-Type: '.$asset->audioType); 
-	header('Content-Disposition: attachment; filename="'.htmlentities($asset->name).str_replace(
-		["audio/mpeg", "audio/ogg", "audio/mid", "audio/wav"], 
-		[".mp3", ".ogg", ".mid", ".wav"], 
-		$asset->audioType).'"'); 
+	$AssetData = str_ireplace(
+		["http://www.roblox.com/asset", "http://roblox.com/asset", "http://www.roblox.com/thumbs", "http://roblox.com/thumbs"], 
+		["https://assetdelivery.roblox.com/v1/asset", "https://assetdelivery.roblox.com/v1/asset", "http://$AssetHost/thumbs", "http://$AssetHost/thumbs"], 
+		$AssetData
+	);
+}
+else
+{
+	$AssetData = str_ireplace(
+		["www.roblox.com/asset", "roblox.com/asset", "www.roblox.com/thumbs", "roblox.com/thumbs"], 
+		["$AssetHost/asset", "$AssetHost/asset", "$AssetHost/thumbs", "$AssetHost/thumbs"], 
+		$AssetData
+	);
+}
+
+if(!$RobloxAsset && $Asset->type == 3 && isset($_GET['audiostream']))
+{
+	$FileExtensions = ["audio/mpeg" => ".mp3", "audio/ogg" => ".ogg", "audio/mid" => ".mid", "audio/wav" => ".wav"];
+
+	header('Content-Type: '.$Asset->audioType); 
+	header('Content-Disposition: attachment; filename="'.htmlentities($Asset->name).$FileExtensions[$Asset->audioType].'"'); 
 }
 else
 {
 	header('Content-Type: binary/octet-stream'); 
-	if($rblxasset) header('Content-Disposition: attachment'); 
-	else header('Content-Disposition: attachment; filename="'.md5_file("./files/".$asset->id).'"'); 
+	if($RobloxAsset) header('Content-Disposition: attachment; filename="'.sha1($AssetData).'"'); 
+	else header('Content-Disposition: attachment; filename="'.sha1_file("./files/".$Asset->id).'"'); 
 }
 
-if(!$rblxasset && $asset->type == 5)
-{
-	// all lua assets must be signed
-	$assetData = "%".$asset->id."%\n".$assetData;
-	openssl_sign($assetData, $signature, openssl_pkey_get_private("file://".$_SERVER['DOCUMENT_ROOT']."/../polygon_private.pem"));
-	$assetData = "%".base64_encode($signature)."%".$assetData;
-}
+if(!$RobloxAsset && $Asset->type == 5) $AssetData = RBXClient::CryptSignScript($AssetData, $Asset->id);
 
-header('Content-Length: '.strlen($assetData));
-die($assetData);
+header('Content-Length: '.strlen($AssetData));
+die($AssetData);

@@ -1,12 +1,14 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
-api::initialize(["method" => "POST", "admin" => true, "logged_in" => true, "secure" => true]);
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
+
+api::initialize(["method" => "POST", "admin" => [Users::STAFF_CATALOG, Users::STAFF_ADMINISTRATOR], "logged_in" => true, "secure" => true]);
 
 $type = $_POST["type"] ?? false;
 $page = $_POST["page"] ?? 1;
 $assets = [];
 
-if(!catalog::getTypeByNum($type)) api::respond(400, false, "Invalid asset type");
+if(!Catalog::GetTypeByNum($type)) api::respond(400, false, "Invalid asset type");
 
 $query = $pdo->prepare("SELECT COUNT(*) FROM assets WHERE creator = 2 AND type = :type ORDER BY id DESC");
 $query->bindParam(":type", $type, PDO::PARAM_INT);
@@ -21,7 +23,7 @@ $query->execute();
 
 while($asset = $query->fetch(PDO::FETCH_OBJ))
 {
-	$info = catalog::getItemInfo($asset->id);
+	$info = Catalog::GetAssetInfo($asset->id);
 
 	$assets[] = 
 	[

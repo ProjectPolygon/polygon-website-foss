@@ -1,5 +1,6 @@
 <?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/db.php';
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/config.php';
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/components/db.php';
 
 $x = $_GET['x'] ?? $_GET['wd'] ?? 100;
 $y = $_GET['y'] ?? $_GET['ht'] ?? 100;

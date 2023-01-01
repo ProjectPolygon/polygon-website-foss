@@ -1,12 +1,10 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+Users::RequireLogin();
 
 pageBuilder::$pageConfig["title"] = "Games";
 pageBuilder::$JSdependencies[] = "/js/protocolcheck.js";
 pageBuilder::$polygonScripts[] = "/js/polygon/games.js?t=".time();
-
-$playedBefore = db::run("SELECT COUNT(*) FROM client_sessions WHERE uid = :uid", [":uid" => SESSION["userId"]])->fetchColumn() > 5;
 
 pageBuilder::buildHeader();
 ?>
@@ -31,13 +29,12 @@ pageBuilder::buildHeader();
 				<a class="btn btn-sm btn-primary btn-block" href="/games/new">Create Server</a>
 			</div>
 			<div class="col-xl-3 col-lg-4 col-md-6 px-2" style="margin-top:5px">
-				<a class="btn btn-sm btn-success btn-block download-client disabled">Download Client</a>
+				<a class="btn btn-sm btn-success btn-block download-client disabled">Select a version to download</a>
 			</div>
 			<?php } ?>
 		</div>
 	</div>
 </div>
-<?php if(!$playedBefore){ ?><div class="alert alert-primary px-2 py-1 mb-3" role="alert">First time playing? <a href="/info/selfhosting">Read this first</a></div><?php } ?>
 <div class="games-container">
 	<div class="items row"></div>
 	<div class="text-center">
@@ -51,7 +48,7 @@ pageBuilder::buildHeader();
 				<div class="card-body">
 					<div class="row">
 						<div class="col-lg-4">
-							<img src="$server_thumbnail" class="img-fluid">
+							<img preload-src="$server_thumbnail" class="img-fluid">
 						</div>
 						<div class="col-lg-8 pb-3">
 							<h4 class="font-weight-normal"><a href="/games/server?ID=$server_id">$server_name</a></h4>

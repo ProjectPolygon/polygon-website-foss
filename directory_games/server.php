@@ -1,14 +1,17 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Games");
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
 
-$server = games::getServerInfo($_GET['ID'] ?? $_GET['id'] ?? false);
+Users::RequireLogin();
+
+$server = Games::GetServerInfo($_GET['ID'] ?? $_GET['id'] ?? false);
 if(!$server) pageBuilder::errorCode(404);
-$players = games::getPlayersInServer($server->id);
-$isCreator = SESSION && (SESSION["adminLevel"] >= 2 || $server->hoster == SESSION["userId"]);
+$players = Games::GetPlayersInServer($server->id);
+$isCreator = SESSION && (Users::IsAdmin(Users::STAFF_ADMINISTRATOR) || $server->hoster == SESSION["userId"]);
 $gears = json_decode($server->allowed_gears, true);
 
-pageBuilder::$pageConfig["title"] = polygon::filterText($server->name, true, false);
+pageBuilder::$pageConfig["title"] = Polygon::FilterText($server->name, true, false);
 pageBuilder::$JSdependencies[] = "/js/protocolcheck.js";
 pageBuilder::$polygonScripts[] = "/js/polygon/games.js?t=".time();
 pageBuilder::buildHeader();
@@ -37,11 +40,11 @@ pageBuilder::buildHeader();
 	  	</div>
 	</div>
 	<?php } ?>
-	<h2 class="font-weight-normal"><?=polygon::filterText($server->name)?></h2>
+	<h2 class="font-weight-normal"><?=Polygon::FilterText($server->name)?></h2>
 	<div class="row">
 		<div class="col">
 			<h5 class="font-weight-normal mb-0">Description</h5>
-			<?php if(strlen($server->description)){ echo polygon::filterText($markdown->text($server->description, $server->hoster == 1), false); } else { ?>
+			<?php if(strlen($server->description)){ echo Polygon::FilterText($markdown->text($server->description, $server->hoster == 1), false); } else { ?>
 			<p class="mb-0 text-secondary">No description available.</p>
 			<?php } if($server->online) { ?>
 			<div class="divider-bottom my-3"></div>
@@ -60,9 +63,9 @@ pageBuilder::buildHeader();
 			<div class="divider-bottom my-3"></div>
 			<h5 class="font-weight-normal">It's time to get your server running!</h5>
 			<p>To host, you will have to port forward. If you don't know how, there are some <a href="https://www.youtube.com/watch?v=i-Vl_HZhpPA">old tutorials</a> that are still relevant and work here.</p>
-			<p>Currently, Project Polygon does not support ROBLOX asset URLs. To get assets on your map to load properly, open your map file in a text editor, do a find/replace for <code>www.roblox.com/asset</code> with <code>chef.pizzaboxer.xyz/asset</code> and save the map.</p>
+			<p>Currently, Project Polygon does not support ROBLOX asset URLs yet. To get assets on your map to load properly, open your map file in a text editor, do a find/replace for <code>www.roblox.com/asset</code> with <code><?=$_SERVER['HTTP_HOST']?>/asset</code> and save the map.</p>
 			<p>Once you've port forwarded and fixed the asset URLs, you can now start hosting. Open studio, open your map and paste this into the command bar:</p>
-			<code>dofile('http://<?=$_SERVER['HTTP_HOST']?>/game/server?ticket=<?=$server->ticket?>')</code>
+			<code>loadfile('http://<?=$_SERVER['HTTP_HOST']?>/game/server?ticket=<?=$server->ticket?>')()</code>
 			<p class="mt-3">If a Windows Defender Firewall prompt pops up when you run it, click Allow or your server won't be accessible to the internet.</p>
 			<?php } ?>
 		</div>
@@ -87,7 +90,7 @@ pageBuilder::buildHeader();
 				<?php if(!in_array(true, $gears)) { ?>
 				<i class="far fa-times-circle" data-toggle="tooltip" data-placement="bottom" title="No Gear Allowed"></i>
 				<?php } else { foreach($gears as $attr => $enabled) { if($enabled) { ?>
-				<i class="<?=catalog::$gear_attr_display[$attr]["icon"]?>" data-toggle="tooltip" data-placement="bottom" title="<?=catalog::$gear_attr_display[$attr]["text_sel"]?>"></i>
+				<i class="<?=Catalog::$GearAttributesDisplay[$attr]["icon"]?>" data-toggle="tooltip" data-placement="bottom" title="<?=Catalog::$GearAttributesDisplay[$attr]["text_sel"]?>"></i>
 				<?php } } } ?>
 			</div>
 		</div>

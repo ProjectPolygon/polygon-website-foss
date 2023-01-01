@@ -1,5 +1,6 @@
 <?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/db.php';
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/config.php';
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/components/db.php';
 
 header("Pragma: no-cache");
 header("Cache-Control: no-cache");

@@ -1,4 +1,5 @@
 <?php require $_SERVER['DOCUMENT_ROOT']."/api/private/core.php";
+Polygon::ImportClass("RBXClient");
 
 header("Pragma: no-cache");
 header("Cache-Control: no-cache");
@@ -12,7 +13,7 @@ $params = (object)
 	"userid" => 0,
 	"membership" => "None",
 	"age" => 0,
-	"charappUrl" => "",
+	"charappUrl" => "http://{$_SERVER['HTTP_HOST']}/Asset/CharacterFetch.ashx?userId=2",
 	"pingUrl" => "",
 	"uploadUrl" => ""
 ];
@@ -21,7 +22,7 @@ if(SESSION)
 {
 	$params->username = SESSION["userName"];
 	$params->userid = SESSION["userId"];
-	$params->charappUrl = "http://{$_SERVER['HTTP_HOST']}/asset/characterfetch?userId={$params->userid}";
+	$params->charappUrl = "http://{$_SERVER['HTTP_HOST']}/Asset/CharacterFetch.ashx?userId={$params->userid}";
 	if(SESSION["adminLevel"]) $params->membership = "OutrageousBuildersClub";
 }
 
@@ -95,8 +96,8 @@ end)--]]
 
 function doVisit()
 	message.Text = "Loading Game"
-	if true then
-		game:Load("http://chef.pizzaboxer.xyz/asset/?id=1818&version=1&forcerblxasset")
+	if false then
+		game:Load("")
 		pcall(function() visit:SetUploadUrl("") end)
 	else
 	    pcall(function() visit:SetUploadUrl("") end)
@@ -107,7 +108,7 @@ function doVisit()
 	game:GetService("RunService"):Run()
 
 	message.Text = "Creating Player"
-	if true then
+	if false then
 		player = game:GetService("Players"):CreateLocalPlayer(<?=$params->userid?>)
 		player.Name = [====[<?=$params->username?>]====]
 	else
@@ -168,4 +169,4 @@ else
 		game:HttpPost("http://<?=$_SERVER['HTTP_HOST']?>/Error/Lua.ashx?", "Visit.lua: " .. err)
 	end
 end
-<?php echo RBX::cryptSignScript(ob_get_clean());
+<?php echo RBXClient::CryptSignScript(ob_get_clean());

@@ -16,8 +16,8 @@ for _,v in pairs(game.GuiRoot:GetChildren()) do v:Remove() end
 if not game.Players.LocalPlayer then game.Players:CreateLocalPlayer(0) end
 plr = game.Players.LocalPlayer 
 
---plr.CharacterAppearance = "http://<?=$_SERVER['HTTP_HOST']?>/asset/characterfetch?userId=<?=$asset?>"
-plr.CharacterAppearance = "<?=users::getCharacterAppearance($asset, -1)?>"
+--plr.CharacterAppearance = "http://<?=$_SERVER['HTTP_HOST']?>/Asset/CharacterFetch.ashx?userId=<?=$asset?>"
+plr.CharacterAppearance = "<?=Users::GetCharacterAppearance($asset, -1)?>"
 plr:LoadCharacter() 
 
 wait(2)

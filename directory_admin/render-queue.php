@@ -1,7 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-if(!SESSION || SESSION && !SESSION["adminLevel"]){ pageBuilder::errorCode(404); }
-
+Users::RequireAdmin();
 $query = $pdo->query("SELECT * FROM renderqueue ORDER BY timestampRequested DESC");
 
 pageBuilder::$CSSdependencies[] = "/css/bootstrap-datepicker.min.css";

@@ -1,6 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+Users::RequireLogin();
 
 $userId = SESSION["userId"];
 $query = $pdo->prepare("
@@ -11,6 +11,7 @@ $query = $pdo->prepare("
 $query->bindParam(":uid", $userId, PDO::PARAM_INT);
 $query->execute();
 
+pageBuilder::$polygonScripts[] = "/js/polygon/money.js?t=".time();
 pageBuilder::$pageConfig['title'] = "Transactions";
 pageBuilder::buildHeader();
 ?>
@@ -42,47 +43,4 @@ pageBuilder::buildHeader();
 		<a class="btn btn-light btn-sm show-more d-none">More transactions</a>
 	</div>
 </div>
-<script>
-	polygon.money = 
-	{
-		type: "Purchases",
-		page: 1,
-		getTransactions: function(append, type)
-		{
-			if(type == undefined) type = polygon.money.type;
-		  	else polygon.money.type = type;
-
-		  	if(append) polygon.money.page += 1;
-		  	else polygon.money.page = 1;
-
-		  	$(".transactions-container .loading").removeClass("d-none");
-		  	$(".transactions-container .show-more").addClass("d-none");
-		  	if(!append) $("tbody").empty();
-
-		  	$.post('/api/account/transactions', {type: type, page: polygon.money.page}, function(data)
-			{  
-				$(".transactions-container .loading").addClass("d-none");
-
-				if(data.transactions == undefined) return $(".transactions-container .no-items").text(data.message).removeClass("d-none");
-
-				$.each(data.transactions, function(_, transaction)
-				{
-					$('<tr>\
-				  		<td>'+transaction.date+'</td>\
-				  		<td class="py-1"><a href="/user?ID='+transaction.member_id+'"><img src="'+transaction.member_avatar+'" style="max-height:40px"></a> '+transaction.member_name+'</td>\
-				  		<td>'+transaction.type+' <a href="/item?ID='+transaction.asset_id+'">'+transaction.asset_name+'</a></td>\
-				  		<td class="text-success"><i class="fal fa-pizza-slice"></i> '+transaction.amount+'</td>\
-		  			</tr>').appendTo(".transactions-container tbody");
-				});
-
-				if(data.pages > polygon.money.page) $(".transactions-container .show-more").removeClass("d-none");
-			});
-		}
-	};
-
-
-	$(".transactions-container .show-more").click(function(){ polygon.money.getTransactions(true); })
-	$(".transactions-container #transactionType").change(function(){ polygon.money.getTransactions(false, $(this).val()); });
-	$(function(){ polygon.money.getTransactions(false, "Purchases"); });
-</script>
 <?php pageBuilder::buildFooter(); ?>

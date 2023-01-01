@@ -1,7 +1,7 @@
 polygon.inventory = 
 {
 	type: 8,
-	display: function(type, page)
+	display: function(page, type)
 	{
 		if(type == null) type = polygon.inventory.type;
 		else polygon.inventory.type = type;
@@ -13,22 +13,20 @@ polygon.inventory =
 		$(".inventory-container .pagination").addClass("d-none");
 		$(".inventory-container .loading").removeClass("d-none");
 
-		$.post('/api/users/getInventory', {userId: $(".app").attr("data-user-id"), type: type, page: page}, function(data)
+		$.post('/api/users/get-inventory', { userId: $(".app").attr("data-user-id"), type: type, page: page }, function(data)
 		{  
 			$(".inventory-container .loading").addClass("d-none");
-			//$(".inventory-container .items").empty();
-			//$(".inventory-container .no-items").addClass("d-none");
 
 			polygon.pagination.handle("inventory", page, data.pages);
-			if(data.assets == undefined) return $(".inventory-container .no-items").text(data.message).removeClass("d-none");
-			polygon.populate(data.assets, ".inventory-template .item", ".inventory-container .items");
+			if(data.items == undefined) return $(".inventory-container .no-items").text(data.message).removeClass("d-none");
+			polygon.populateRow("inventory", data.items);
 		});
 	}
 }
 
-$(".inventory-container .selector").click(function(){ polygon.inventory.display($(this).attr("data-asset-type")); });
+$(".inventory-container .selector").click(function(){ polygon.inventory.display(null, $(this).attr("data-asset-type")); });
 $(function()
 { 
-	polygon.pagination.register("inventory", function(page){ polygon.inventory.display(null, page); }); 
+	polygon.pagination.register("inventory", polygon.inventory.display); 
 	polygon.inventory.display(); 
 });

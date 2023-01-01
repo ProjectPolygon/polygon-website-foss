@@ -1,6 +1,13 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+
+if(!SESSION)
+{
+	if(Polygon::IsClientBrowser())
+		redirect("/");
+	else
+		Users::RequireLogin();
+}
 
 $views = 
 [
@@ -59,7 +66,7 @@ pageBuilder::buildHeader();
 	<?php if(isset($views[$view])) { ?>
 	<div class="col-md-2 p-0 divider-right">
 		<div class="dropdown show mr-3 mb-4">
-		  <a class="btn btn-success btn-block py-1" href="#" role="button" id="buildNew" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+		  <a class="btn btn-success btn-block" href="#" role="button" id="buildNew" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 		  	<h5 class="font-weight-normal mb-1 pb-0">Build New <i class="mt-1 fas fa-caret-down"></i></h5>
 		  </a>
 		  <div class="bg-light dropdown-menu w-100" aria-labelledby="buildNew">

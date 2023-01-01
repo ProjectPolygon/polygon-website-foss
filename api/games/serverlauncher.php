@@ -49,14 +49,17 @@ $query->bindParam(":sid", $serverID, PDO::PARAM_INT);
 $query->bindParam(":teleport", $isTeleport, PDO::PARAM_INT);
 $query->execute();
 
+$Protocol = "https";
+if($serverInfo->version == 2009) $Protocol = "http";
+
 api::respond_custom([
 	"status" => 200, 
 	"success" => true, 
 	"message" => "OK", 
 	"version" => $serverInfo->version, 
-	"joinScriptUrl" => "http://chef.pizzaboxer.xyz/game/join?ticket=".$ticket,
+	"joinScriptUrl" => "{$Protocol}://{$_SERVER['HTTP_HOST']}/game/join?ticket={$ticket}",
 	// these last few params are for teleportservice and lack any function - just ignore
-	"authenticationUrl" => "http://chef.pizzaboxer.xyz/Login/Negotiate.ashx",
-	"authenticationTicket" => "unusedplzignore",
+	"authenticationUrl" => "{$Protocol}://{$_SERVER['HTTP_HOST']}/Login/Negotiate.ashx",
+	"authenticationTicket" => "0",
 	"status" => 2
 ]);

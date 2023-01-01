@@ -1,11 +1,11 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Forum");
 
-users::requireLogin();
+Users::RequireLogin();
 
 if(isset($_GET['PostID']))
 {
-	$threadInfo = forum::getThreadInfo($_GET['PostID']);
+	$threadInfo = Forum::GetThreadInfo($_GET['PostID']);
 	if(!$threadInfo || $threadInfo && $threadInfo->deleted){ pageBuilder::errorCode(404); }
 
 	$subforumId = $threadInfo->subforumid;
@@ -20,7 +20,7 @@ else
 	pageBuilder::errorCode(404);
 }
 
-$subforumInfo = forum::getSubforumInfo($subforumId);
+$subforumInfo = Forum::GetSubforumInfo($subforumId);
 if(!$subforumInfo){ pageBuilder::errorCode(404); }
 if(!$threadInfo && $subforumInfo->minadminlevel && SESSION["adminLevel"] < $subforumInfo->minadminlevel){ pageBuilder::errorCode(404); }
 
@@ -37,10 +37,12 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 	{
 		if(!strlen($subject)) $errors["subject"] = "Subject cannot be empty";
 		else if(strlen($subject) > 64) $errors["subject"] = "Subject must be shorter than 64 characters";
+		else if(Polygon::IsExplicitlyFiltered($subject)) $errors["subject"] = "Subject contains inappropriate text";
 	}
 
 	if(!strlen($body)) $errors["body"] = "Body cannot be empty"; 
 	else if(strlen($body) > 10000) $errors["body"] = "Body must be shorter than 10,000 characters"; 
+	else if(Polygon::IsExplicitlyFiltered($body)) $errors["subject"] = "Body contains inappropriate text";
 
 	$floodcheck = db::run(
 		"SELECT (SELECT COUNT(*) FROM forum_threads WHERE author = :uid AND postTime+30 > UNIX_TIMESTAMP()) + 
@@ -57,7 +59,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 			db::run(
 				"INSERT INTO forum_replies (body, threadId, author, postTime) VALUES (:body, :threadId, :author, UNIX_TIMESTAMP()); 
 				UPDATE forum_threads SET bumpIndex = UNIX_TIMESTAMP() WHERE id = :threadId;",
-				[":body" => $body, ":threadId" => $threadId, ":author" => SESSION["userId"]]
+				[":body" => $body, ":threadId" => $threadInfo->id, ":author" => SESSION["userId"]]
 			);
 
 			die(header("Location: /forum/showpost?PostID=".$threadInfo->id."#reply".$pdo->lastInsertId()));
@@ -84,7 +86,7 @@ pageBuilder::buildHeader();
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
   	<li class="breadcrumb-item"><a href="/forum"><?=SITE_CONFIG["site"]["name"]?> Forums</a></li>
-    <li class="breadcrumb-item"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=polygon::replaceVars($subforumInfo->name)?></a></li>
+    <li class="breadcrumb-item"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=Polygon::ReplaceVars($subforumInfo->name)?></a></li>
     <?php if($threadInfo) { ?>
     <li class="breadcrumb-item active"><a href="/forum/showpost?PostID=<?=$threadInfo->id?>"><?=htmlspecialchars($threadInfo->subject)?></a></li>
     <li class="breadcrumb-item active" aria-current="page">New Reply</li>
@@ -145,7 +147,7 @@ pageBuilder::buildHeader();
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
   	<li class="breadcrumb-item"><a href="/forum"><?=SITE_CONFIG["site"]["name"]?> Forums</a></li>
-    <li class="breadcrumb-item"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=polygon::replaceVars($subforumInfo->name)?></a></li>
+    <li class="breadcrumb-item"><a href="/forum?ID=<?=$subforumInfo->id?>"><?=Polygon::ReplaceVars($subforumInfo->name)?></a></li>
     <?php if($threadInfo) { ?>
     <li class="breadcrumb-item active"><a href="/forum/showpost?PostID=<?=$threadInfo->id?>"><?=htmlspecialchars($threadInfo->subject)?></a></li>
     <li class="breadcrumb-item active" aria-current="page">New Reply</li>

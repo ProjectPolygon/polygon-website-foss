@@ -3,12 +3,12 @@ $bypassModeration = true;
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
 if(!SESSION){ pageBuilder::errorCode(404); }
 
-if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["reactivate"]) && users::undoUserModeration(SESSION["userId"]))
+if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["reactivate"]) && Users::UndoUserModeration(SESSION["userId"]))
 { 
 	redirect("/");
 }
 
-$moderationInfo = users::getUserModeration(SESSION["userId"]);
+$moderationInfo = Users::GetUserModeration(SESSION["userId"]);
 if(!$moderationInfo) pageBuilder::errorCode(404);
 
 $text = 
@@ -38,7 +38,7 @@ $text =
 pageBuilder::$pageConfig["title"] = SITE_CONFIG["site"]["name"]." Moderation";
 pageBuilder::buildHeader();
 ?>
-<div class="card w-75 mx-auto">
+<div class="card mx-auto" style="max-width: 48rem">
   <div class="card-header">
     <?=SITE_CONFIG["site"]["name"]?> Moderation
   </div>
@@ -47,10 +47,8 @@ pageBuilder::buildHeader();
 	<p class="card-text"><?=$text["header"][$moderationInfo->banType]?></p>
 	<p class="card-text">Done at: <?=date('j/n/Y g:i:s A \G\M\T', $moderationInfo->timeStarted)?></p> 
 	<p class="card-text mb-0">Moderator note:</p> 
-	<div class="card">
-	  <div class="card-body p-2">
-	    <?=str_replace('<p>', '<p class="mb-0">', $markdown->text($moderationInfo->reason, true))?>
-	  </div>
+	<div class="card card-body px-2 pb-2 pt-1">
+		<?=str_replace('<p>', '<p class="mb-0">', $markdown->text($moderationInfo->reason, true))?>
 	</div>
 	<br>
 	<p class="card-text"><?=$text["footer"][$moderationInfo->banType]?></p>

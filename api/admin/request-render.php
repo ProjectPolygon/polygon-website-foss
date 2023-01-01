@@ -1,6 +1,7 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
-api::initialize(["method" => "POST", "admin" => true, "secure" => true]);
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+
+api::initialize(["method" => "POST", "admin" => Users::STAFF, "secure" => true]);
 
 $renderType = $_POST['renderType'] ?? false;
 $assetID = $_POST['assetID'] ?? false;
@@ -11,24 +12,24 @@ if(!$assetID || !is_numeric($assetID)) api::respond(400, false, "Bad Request");
 
 if($renderType == "Asset")
 {
-	$asset = catalog::getItemInfo($assetID);
+	$asset = Catalog::GetAssetInfo($assetID);
 	if(!$asset) api::respond(200, false, "The asset you requested does not exist");
 	switch($asset->type)
 	{
-		case 4: polygon::requestRender("Mesh", $assetID); break; // mesh
-		case 8: case 19: polygon::requestRender("Model", $assetID); break; // hat/gear
-		case 11: case 12: polygon::requestRender("Clothing", $assetID); break; // shirt/pants
-		case 17: polygon::requestRender("Head", $assetID); break; // head
-		case 10: polygon::requestRender("UserModel", $assetID); break; // user generated model
+		case 4: Polygon::RequestRender("Mesh", $assetID); break; // mesh
+		case 8: case 19: Polygon::RequestRender("Model", $assetID); break; // hat/gear
+		case 11: case 12: Polygon::RequestRender("Clothing", $assetID); break; // shirt/pants
+		case 17: Polygon::RequestRender("Head", $assetID); break; // head
+		case 10: Polygon::RequestRender("UserModel", $assetID); break; // user generated model
 		default: api::respond(200, false, "This asset cannot be re-rendered");
 	}
 }
 else if($renderType == "Avatar")
 {
-	$user = users::getUserInfoFromUid($assetID);
+	$user = Users::GetInfoFromID($assetID);
 	if(!$user) api::respond(200, false, "The user you requested does not exist");
-	polygon::requestRender("Avatar", $assetID);
+	Polygon::RequestRender("Avatar", $assetID);
 }
 
-users::logStaffAction("[ Render ] Re-rendered $renderType ID $assetID"); 
+Users::LogStaffAction("[ Render ] Re-rendered $renderType ID $assetID"); 
 api::respond(200, true, "Render request has been successfully submitted! See render status <a href='/admin/render-queue'>here</a>");

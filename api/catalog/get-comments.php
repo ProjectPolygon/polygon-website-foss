@@ -1,5 +1,6 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Thumbnails");
+
 api::initialize();
 
 if(!isset($_GET['assetID'])) api::respond(400, false, "Bad Request");
@@ -29,7 +30,7 @@ while($row = $query->fetch(PDO::FETCH_OBJ))
 		"commenter_name" => $row->username,
 		"commenter_id" => $row->author,
 		"commenter_avatar" => Thumbnails::GetAvatar($row->author, 110, 110),
-		"content" => nl2br(polygon::filterText($row->content))
+		"content" => nl2br(Polygon::FilterText($row->content))
 	]; 
 }
 

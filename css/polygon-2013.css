@@ -1,0 +1,89 @@
+.btn
+{
+    border-radius: 0!important;
+}
+
+.btn-success,.btn-success:link,.btn-success:active,.btn-success:visited
+{
+    border-color:#007001!important;
+    background-color:#007001!important;
+    background-image:url(/img/2013/Buttons/StyleGuide/bg-btn-green.png);
+    color:white;
+}
+    
+.btn-primary,.btn-primary:link,.btn-primary:active,.btn-primary:visited
+{
+    border-color:#0852b7!important;
+    background-color:#0852b7!important;
+    background-image:url(/img/2013/Buttons/StyleGuide/bg-btn-blue.png);
+    color:white;
+}
+    
+.btn-secondary,.btn-secondary:link,.btn-secondary:active,.btn-secondary:visited
+{
+    border-color:#565656!important;
+    background-color:#565656!important;
+    background-image:url(/img/2013/Buttons/StyleGuide/bg-btn-gray.png);
+    color:white;
+}
+
+.btn-light,.btn-light:active,.btn-light:link,.btn-light:visited,.btn-light:hover
+{
+    border:1px solid #777;
+    padding:0 6px;
+    color:#000;
+    text-decoration:none;
+    background-color:#ccc;
+    text-align:center;
+    font-weight:normal;
+    cursor:pointer;
+    background-position:top;
+    display:inline-block;
+    *zoom:1;
+    *display:inline;
+}
+
+.btn-light:hover
+{
+    background-position:bottom;
+    border-color:#888;
+    text-decoration:none;
+}
+
+.btn-light.disabled
+{
+    border:1px solid #ccc;
+    cursor:default;
+    color:#a7a7a7;
+    background-position:center;
+}
+
+.btn-light.btn-sm
+{
+    height:18px;
+    line-height:18px;
+    font-size:11px;
+    background-image:url(/img/2013/StyleGuide/btn-control-small-tile.png);
+}
+
+.btn-light
+{
+    height:21px;
+    line-height:21px;
+    font-size:12px;
+    background-image:url(/img/2013/StyleGuide/btn-control-medium-tile.png);
+}
+
+.btn-light
+{
+    height:25px;
+    line-height:24px;
+    font-size:13px;
+    padding:0 7px;
+    background-image:url(/img/2013/StyleGuide/btn-control-large-tile.png);
+}
+
+a.btn-light.top-level
+{
+    font-weight:bold;
+}

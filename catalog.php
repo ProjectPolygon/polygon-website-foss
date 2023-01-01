@@ -1,6 +1,8 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-// users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
+
+Users::RequireLogin();
 
 // this is a catastrophe
 
@@ -47,7 +49,7 @@ if($cat == 3 && !isset($_GET['Category']))
 if(!isset($cats[$cat])) 
 	die(header("Location: /catalog"));
 
-if($subcat && (isset($cats[$cat]["type"]) || !in_array($subcat, $cats[$cat]["subcategories"]))) 
+if($subcat && ($cat == 1 || isset($cats[$cat]["type"]) || !in_array($subcat, $cats[$cat]["subcategories"]))) 
 	die(header("Location: /catalog?Category=".$cat));
 
 if(!in_array($currency, [0, 1, 2])) 
@@ -95,7 +97,7 @@ $query->bindParam(":keywd", $keyword_sql, PDO::PARAM_STR);
 $query->bindParam(":offset", $offset, PDO::PARAM_INT);
 $query->execute();
 
-pageBuilder::$polygonScripts[] = "/js/polygon/catalog.js";
+pageBuilder::$polygonScripts[] = "/js/polygon/catalog.js?t=1";
 pageBuilder::$pageConfig["title"] = "Avatar Items, Virtual Avatars, Virtual Goods";
 pageBuilder::buildHeader();
 ?>
@@ -121,7 +123,7 @@ pageBuilder::buildHeader();
 		  	<div class="input-group-append">
 			  	<select class="form-control mb-2 categoriesForKeyword rounded-0" style="width:auto">
 			  		<?php if(isset($cats[$cat]["subcategories"]) && $subcat) { ?>
-			  		<option value="Custom" selected="selected"><?=plural(catalog::getTypeByNum($type))?></option>
+			  		<option value="Custom" selected="selected"><?=plural(Catalog::GetTypeByNum($type))?></option>
 			  		<?php } foreach($cats as $cat_id => $cat_data) { ?>
 			    	<option value="<?=$cat_id?>"<?=!isset($_GET['Subcategory']) && $cat==$cat_id?' selected':''?>><?=$cat_data["name"]?></option>
 			    	<?php } ?>
@@ -137,7 +139,7 @@ pageBuilder::buildHeader();
 		  	<a class="btn btn-secondary btn-block text-left"<?=isset($_GET['Category'])?' href="#" role="button" id="browseByCategory" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"':''?>>
 		  		<h5 class="font-weight-normal m-0">Category <i class="mt-1 ml-2 mr-1 fas fa-caret-down float-right"></i></h5>
 		  	</a>
-		  	<div class="bg-light dropdown-menu w-100<?=!isset($_GET['Category'])?' d-block':''?>" style="min-width:5rem;" aria-labelledby="browseByCategory">
+		  	<div class="bg-cardpanel dropdown-menu w-100<?=!isset($_GET['Category'])?' d-block':''?>" style="min-width:5rem;" aria-labelledby="browseByCategory">
 		    	<?php foreach($cats as $dropdown_id => $dropdown_cat) { ?>
 		    	<a href="#category=<?=strtolower(str_replace(' ', '', $dropdown_cat["name"]))?>" class="dropdown-item assetTypeFilter" data-category="<?=$dropdown_id?>"><?=$dropdown_cat["name"]?></a>
 		    	<?php } ?>
@@ -150,7 +152,7 @@ pageBuilder::buildHeader();
 			<h6 class="ml-2 font-weight-normal mb-1">Category</h6>
 			<div class="ml-3 filter-category">
 				<?php if(isset($cats[$cat]["subcategories"]) && $subcat) { ?>
-			  	<p class="m-0"><?=plural(catalog::getTypeByNum($type))?></p>
+			  	<p class="m-0"><?=plural(Catalog::GetTypeByNum($type))?></p>
 			  	<?php } foreach($cats as $cat_id => $cat_data) { ?>
 			    <p class="m-0"><a href="#category=<?=$cat_data["name"]?>" class="assetTypeFilter<?=$cat==$cat_id?' text-dark text-decoration-none':''?>" data-keepfilters="true" data-category="<?=$cat_id?>"><?=$cat_data["name"]?></a></p>
 			    <?php } ?>
@@ -161,7 +163,7 @@ pageBuilder::buildHeader();
 			<div class="ml-3 filter-subcategory">
 				<p class="m-0"><a href="#category=All <?=$cats[$cat]["name"]?>" class="assetTypeFilter<?=!$subcat?' text-dark text-decoration-none':''?>" data-types="3">All <?=$cats[$cat]["name"]?></a></p>
 				<?php foreach($cats[$cat]["subcategories"] as $cat_id) { ?>
-				<p class="m-0"><a href="#category=<?=plural(catalog::getTypeByNum($cat_id))?>" class="assetTypeFilter<?=$subcat==$cat_id?' text-dark text-decoration-none':''?>" data-types="<?=$cat_id?>"><?=plural(catalog::getTypeByNum($cat_id))?></a></p>
+				<p class="m-0"><a href="#category=<?=plural(Catalog::GetTypeByNum($cat_id))?>" class="assetTypeFilter<?=$subcat==$cat_id?' text-dark text-decoration-none':''?>" data-types="<?=$cat_id?>"><?=plural(Catalog::GetTypeByNum($cat_id))?></a></p>
 				<?php } ?>
 			</div>
 			<div class="divider-bottom my-3"></div>
@@ -188,63 +190,61 @@ pageBuilder::buildHeader();
 			  	<li class="breadcrumb-item text-dark active"><?=$cats[$cat]["name"]?></li>
 			  	<?php } else { ?>
 			    <li class="breadcrumb-item text-dark"><a href="?SortType=1&SortCurrency=0&Category=<?=$cat?>"><?=$cats[$cat]["name"]?></a></li>
-			    <li class="breadcrumb-item text-dark active"><?=plural(catalog::getTypeByNum($type))?></li>
+			    <li class="breadcrumb-item text-dark active"><?=plural(Catalog::GetTypeByNum($type))?></li>
 				<?php } ?>
 			</ol>
 		</nav>
-		<?php if($query->rowCount()) { ?>
-		<div class="row">
-			<div class="col-xl-9 col-lg-8 col-md-6">
-				<p>Showing <?=number_format($offset+1)?> - <?=number_format($offset+$query->rowCount())?> of <?=number_format($results)?> results</p>
-			</div>
-			<div class="col-xl-3 col-lg-4 col-md-6 pr-2 mb-2 d-flex">
-				<label class="form-label form-label-sm" for="sortBy" style="width:6rem;">Sort by: </label>
-				<select class="Sort form-control form-control-sm" id="sortBy">
-					<option value="0"<?=$sort==0?' selected="selected"':''?>>Bestselling</option>
-					<option value="1"<?=$sort==1?' selected="selected"':''?>>Recently updated</option>
-					<option value="2"<?=$sort==2?' selected="selected"':''?>>Price (High to Low)</option>
-					<option value="3"<?=$sort==3?' selected="selected"':''?>>Price (Low to High)</option>
-				</select>
-			</div>
-		</div>
-		<?php } else { ?>
-		<p class="text-center">No results matched your criteria</p>
-		<?php } ?>
-		<div class="items row pl-2">
-			<?php while($item = $query->fetch(PDO::FETCH_OBJ)) { ?>
-			<div class="item col-xl-2 col-lg-3 col-md-3 col-sm-4 col-6 pb-3 px-2" style="line-height:normal">
-				<div class="card info hover">
-				    <a href="/<?=encode_asset_name($item->name)?>-item?id=<?=$item->id?>"><img src="/thumbs/catalog-loading.png" preload-src="<?=Thumbnails::GetAsset($item, 420, 420)?>" class="card-img-top img-fluid p-2" title="<?=polygon::filterText($item->name)?>" alt="<?=polygon::filterText($item->name)?>"></a>
-					<div class="card-body pt-0 px-2 pb-2">
-					  	<p class="text-truncate text-primary m-0" title="<?=polygon::filterText($item->name)?>"><a href="/<?=encode_asset_name($item->name)?>-item?id=<?=$item->id?>"><?=polygon::filterText($item->name)?></a></p>
-					  	<?php if($item->sale) { ?><p class="m-0<?=$item->price?' text-success':''?>"><?=$item->price ? '<i class="fal fa-pizza-slice"></i> '.number_format($item->price):'Free'?></p><?php } ?>
-					</div>
+		<div class="catalog-container">
+			<?php if($query->rowCount()) { ?>
+			<div class="row">
+				<div class="col-xl-9 col-lg-8 col-md-6">
+					<p>Showing <?=number_format($offset+1)?> - <?=number_format($offset+$query->rowCount())?> of <?=number_format($results)?> results</p>
 				</div>
-				<div class="details-wrapper">
-					<div class="card details d-none">
+				<div class="col-xl-3 col-lg-4 col-md-6 pr-2 mb-2 d-flex">
+					<label class="form-label form-label-sm" for="sortBy" style="width:6rem;">Sort by: </label>
+					<select class="Sort form-control form-control-sm" id="sortBy">
+						<option value="0"<?=$sort==0?' selected="selected"':''?>>Bestselling</option>
+						<option value="1"<?=$sort==1?' selected="selected"':''?>>Recently updated</option>
+						<option value="2"<?=$sort==2?' selected="selected"':''?>>Price (High to Low)</option>
+						<option value="3"<?=$sort==3?' selected="selected"':''?>>Price (Low to High)</option>
+					</select>
+				</div>
+			</div>
+			<?php } else { ?>
+			<p class="text-center">No results matched your criteria</p>
+			<?php } ?>
+			<div class="items row pl-2">
+				<?php while($item = $query->fetch(PDO::FETCH_OBJ)) { ?>
+				<div class="item col-xl-2 col-lg-3 col-md-3 col-sm-4 col-6 pb-3 px-2" style="line-height:normal">
+					<div class="card info hover">
+					    <a href="/<?=encode_asset_name($item->name)?>-item?id=<?=$item->id?>"><img src="<?=Thumbnails::GetStatus("rendering", 420, 420)?>" preload-src="<?=Thumbnails::GetAsset($item, 420, 420)?>" class="card-img-top img-fluid p-2" title="<?=Polygon::FilterText($item->name)?>" alt="<?=Polygon::FilterText($item->name)?>"></a>
 						<div class="card-body pt-0 px-2 pb-2">
-						<p class="text-truncate m-0"><small class="text-muted">Creator: <a href="/user?ID=<?=$item->creator?>"><?=$item->username?></a></small></p>
-						<p class="text-truncate m-0"><small class="text-muted">Updated: <span class="text-dark"><?=timeSince($item->updated)?></span></small></p>
-						<p class="text-truncate m-0"><small class="text-muted">Sales: <span class="text-dark"><?=number_format($item->sales)?></span></small></p>
+						  	<p class="text-truncate text-primary m-0" title="<?=Polygon::FilterText($item->name)?>"><a href="/<?=encode_asset_name($item->name)?>-item?id=<?=$item->id?>"><?=Polygon::FilterText($item->name)?></a></p>
+						  	<?php if($item->sale) { ?><p class="m-0<?=$item->price?' text-success':''?>"><?=$item->price ? '<i class="fal fa-pizza-slice"></i> '.number_format($item->price):'Free'?></p><?php } ?>
+						</div>
+					</div>
+					<div class="details-wrapper">
+						<div class="card details d-none">
+							<div class="card-body pt-0 px-2 pb-2">
+							<p class="text-truncate m-0"><small class="text-muted">Creator: <a href="/user?ID=<?=$item->creator?>"><?=$item->username?></a></small></p>
+							<p class="text-truncate m-0"><small class="text-muted">Updated: <span class="text-dark"><?=timeSince($item->updated)?></span></small></p>
+							<p class="text-truncate m-0"><small class="text-muted">Sales: <span class="text-dark"><?=number_format($item->sales)?></span></small></p>
+							</div>
 						</div>
 					</div>
 				</div>
+				<?php } ?>
+			</div>
+			<?php if($pages > 1) { ?>
+			<div class="pagination form-inline justify-content-center">
+				<button type="button" class="btn btn-light mx-3 back"<?=$page<=1?' disabled':''?>><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
+				<span>Page</span> 
+				<input class="form-control form-control-sm text-center mx-1 page" type="text" style="width:30px" value="<?=$page?>"> 
+				<span>of <?=$pages?></span>
+				<button type="button" class="btn btn-light mx-3 next"<?=$page>=$pages?' disabled':''?>><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
 			</div>
 			<?php } ?>
 		</div>
-		<?php if($pages > 1) { ?>
-		<div class="pagination form-inline justify-content-center">
-			<button type="button" class="btn btn-light mx-3 back"<?=$page<=1?' disabled':''?>><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
-			<span>Page</span> 
-			<input class="form-control form-control-sm text-center mx-1 page" type="text" style="width:30px" value="<?=$page?>"> 
-			<span>of <?=$pages?></span>
-			<button type="button" class="btn btn-light mx-3 next"<?=$page>=$pages?' disabled':''?>><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
-		</div>
-		<?php } ?>
 	</div>
 </div>
-<script>
-	$(".items .item img").each(function(){ $(this).attr("src", $(this).attr("preload-src")); });
-	$(".items .item").hover(function(){ $(this).find(".details").removeClass("d-none"); }, function(){ $(this).find(".details").addClass("d-none"); });
-</script>
 <?php pageBuilder::buildFooter(); ?>

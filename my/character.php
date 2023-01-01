@@ -1,15 +1,17 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Thumbnails");
+
+Users::RequireLogin();
 
 $bodycolors = json_decode(SESSION["userInfo"]["bodycolors"]);
+
+pageBuilder::$polygonScripts[] = "/js/polygon/character.js?t=".time();
 pageBuilder::$pageConfig["title"] = "Character Customizer";
 pageBuilder::buildHeader();
 ?>
-<?php if(polygon::getServerPing(1) + 30 < time()) { ?>
+<?php if(Polygon::GetServerPing(1) + 30 < time()) { ?>
 <div class="alert alert-primary px-2 py-1" role="alert">The thumbnail server is currently offline</div>
 <?php } ?>
-<div class="alert alert-primary px-2 py-1" role="alert">if u get someone elses avatar then like jus rerender idk</div>
 <h2 class="font-weight-normal">Character Customizer</h2>
 <div class="row mt-4 px-3">
 	<div class="col-md-4">
@@ -62,16 +64,18 @@ pageBuilder::buildHeader();
 					</div>
 					<div class="items row"></div>
 					<div class="pagination form-inline justify-content-center d-none">
-						<button type="button" class="btn btn-light back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
-						<span class="px-3">Page <input class="form-control form-control-sm text-center mx-1 page" type="text" data-last-page="1" style="width:30px"> of <span class="pages">10</span></span>
-						<button type="button" class="btn btn-light next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
+						<button type="button" class="btn btn-light mx-2 back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
+						<span>Page</span> 
+						<input class="form-control form-control-sm text-center mx-1 px-0 page" type="text" data-last-page="1" style="width:40px"> 
+						<span>of <span class="pages">10</span></span>
+						<button type="button" class="btn btn-light mx-2 next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
 					</div>
 				</div>
 				<div class="template d-none">
 				  	<div class="item col-sm-3 col-6 mb-3 px-2">
 					  	<div class="card hover">
 					  		<a class="btn btn-sm btn-primary px-3 toggle-wear" data-asset-id="$item_id" style="position:absolute;right:0">Wear</a>
-					    	<a href="$url"><img src="$item_thumbnail" class="card-img-top img-fluid p-2" title="$item_name" alt="$item_name"></a>
+					    	<a href="$url"><img preload-src="$item_thumbnail" class="card-img-top img-fluid p-2" title="$item_name" alt="$item_name"></a>
 							<div class="card-body pt-0 px-2 pb-2" style="line-height:normal">
 						  		<p class="text-truncate text-primary m-0" title="$item_name"><a href="$url">$item_name</a></p>
 							</div>
@@ -88,22 +92,22 @@ pageBuilder::buildHeader();
 			<div class="ColorChooserFrame mx-auto" style="height:240px;width:194px;text-align:center;">
 				<div style="position: relative; margin: 11px 4px; height: 1%;">
 					<div style="position: absolute; left: 72px; top: 0px; cursor: pointer">
-						<div class="ColorChooserRegion" data-body-part="Head" style="background-color:#<?=users::bc2hex($bodycolors->Head)?>;height:44px;width:44px;"></div>
+						<div class="ColorChooserRegion" data-body-part="Head" style="background-color:#<?=Users::bc2hex($bodycolors->Head)?>;height:44px;width:44px;"></div>
 					</div>
 					<div style="position: absolute; left: 0px; top: 52px; cursor: pointer">
-						<div class="ColorChooserRegion" data-body-part="Right Arm" style="background-color:#<?=users::bc2hex($bodycolors->{'Right Arm'})?>;height:88px;width:40px;"></div>
+						<div class="ColorChooserRegion" data-body-part="Right Arm" style="background-color:#<?=Users::bc2hex($bodycolors->{'Right Arm'})?>;height:88px;width:40px;"></div>
 					</div>
 					<div style="position: absolute; left: 48px; top: 52px; cursor: pointer">
-						<div class="ColorChooserRegion" data-body-part="Torso" style="background-color:#<?=users::bc2hex($bodycolors->Torso)?>;height:88px;width:88px;"></div>
+						<div class="ColorChooserRegion" data-body-part="Torso" style="background-color:#<?=Users::bc2hex($bodycolors->Torso)?>;height:88px;width:88px;"></div>
 					</div>
 					<div style="position: absolute; left: 144px; top: 52px; cursor: pointer">
-						<div class="ColorChooserRegion" data-body-part="Left Arm" style="background-color:#<?=users::bc2hex($bodycolors->{'Left Arm'})?>;height:88px;width:40px;"></div>
+						<div class="ColorChooserRegion" data-body-part="Left Arm" style="background-color:#<?=Users::bc2hex($bodycolors->{'Left Arm'})?>;height:88px;width:40px;"></div>
 					</div>
 					<div style="position: absolute; left: 48px; top: 146px; cursor: pointer">
-						<div class="ColorChooserRegion" data-body-part="Left Leg" style="background-color:#<?=users::bc2hex($bodycolors->{'Left Leg'})?>;height:88px;width:40px;"></div>
+						<div class="ColorChooserRegion" data-body-part="Left Leg" style="background-color:#<?=Users::bc2hex($bodycolors->{'Left Leg'})?>;height:88px;width:40px;"></div>
 					</div>
 					<div style="position: absolute; left: 96px; top: 146px; cursor: pointer">
-						<div class="ColorChooserRegion" data-body-part="Right Leg" style="background-color:#<?=users::bc2hex($bodycolors->{'Right Leg'})?>;height:88px;width:40px;"></div>
+						<div class="ColorChooserRegion" data-body-part="Right Leg" style="background-color:#<?=Users::bc2hex($bodycolors->{'Right Leg'})?>;height:88px;width:40px;"></div>
 					</div>
 				</div>
 			</div>
@@ -118,15 +122,17 @@ pageBuilder::buildHeader();
 			</div>
 			<div class="items row"></div>
 			<div class="pagination form-inline justify-content-center d-none">
-				<button type="button" class="btn btn-light back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
-				<span class="px-3">Page <input class="form-control form-control-sm text-center mx-1 page" type="text" data-last-page="1" style="width:30px"> of <span class="pages">10</span></span>
-				<button type="button" class="btn btn-light next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
+				<button type="button" class="btn btn-light mx-2 back"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></button>
+				<span>Page</span> 
+				<input class="form-control form-control-sm text-center mx-1 px-0 page" type="text" data-last-page="1" style="width:40px"> 
+				<span>of <span class="pages">10</span></span>
+				<button type="button" class="btn btn-light mx-2 next"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></button>
 			</div>
 			<div class="template d-none">
 				<div class="item col-sm-3 col-6 mb-3 px-2">
 					<div class="card hover">
 						<a class="btn btn-sm btn-primary px-2 toggle-wear" data-asset-id="$item_id" style="position:absolute;right:0">Remove</a>
-						<a href="$url"><img src="$item_thumbnail" class="card-img-top img-fluid p-2" title="$item_name" alt="$item_name"></a>
+						<a href="$url"><img preload-src="$item_thumbnail" class="card-img-top img-fluid p-2" title="$item_name" alt="$item_name"></a>
 						<div class="card-body pt-0 px-2 pb-2" style="line-height:normal">
 							<p class="text-truncate text-primary m-0" title="$item_name"><a href="$url">$item_name</a></p>
 						</div>
@@ -136,15 +142,6 @@ pageBuilder::buildHeader();
 		</div>
 	</div>
 </div>
-<style>
-	.ColorPickerItem:hover
-	{     
-		cursor: pointer;
-		border-color: #e1e1e1;
-    	border-style: solid;
-    	border-width: 2px; 
-    }
-</style>
 <div class="ColorPickerModalTemplate d-none">
 	<div class="ColorPickerContainer text-left mx-auto" data-body-part="$body_part" style="max-width:262px">
 		<div class="ColorPickerItem" style="display:inline-block;background-color:#B4D2E4;height:40px;width:40px;"></div>
@@ -213,112 +210,4 @@ pageBuilder::buildHeader();
 		<!--div class="ColorPickerItem" style="display:inline-block;background-color:#111111;height:40px;width:40px;"></div-->
 	</div>
 </div>
-<script>
-polygon.character = 
-{
-	type: 8,
-	wardrobe_page: 1,
-	wearing_page: 1,
-
-	get_wardrobe: function(type, page)
-	{
-		if(type == null) type = polygon.character.type;
-		else polygon.character.type = type;
-
-		if(page == undefined) page = polygon.character.wardrobe_page;
-		else polygon.character.wardrobe_page = page;
-
-		// $(".wardrobe-container .items").empty();
-		// $(".wardrobe-container .loading").removeClass("d-none");
-		$(".wardrobe-container .no-items").addClass("d-none");
-		//z$(".wardrobe-container .pagination").addClass("d-none");
-
-		$.post('/api/account/character/get-assets', {type: type, page: page, wearing: false}, function(data)
-		{  
-			$(".wardrobe-container .items").empty();
-			$(".wardrobe-container .loading").addClass("d-none");
-			polygon.pagination.handle("wardrobe", page, data.pages);
-			if(data.items == undefined) return $(".wardrobe-container .no-items").text(data.message).removeClass("d-none");
-			polygon.populate(data.items, ".wardrobe-container .template .item", ".wardrobe-container .items");
-		});
-	},
-
-	get_wearing: function(page)
-	{
-		if(page == undefined) page = this.wearing_page;
-		else this.wearing_page = page;
-
-		$.post('/api/account/character/get-assets', {page: page, wearing: true}, function(data)
-		{  
-			$(".wearing-container .loading").addClass("d-none");
-			$(".wearing-container .items").empty();
-			$(".wearing-container .no-items").addClass("d-none");
-
-			polygon.pagination.handle("wearing", page, data.pages);
-			if(data.items == undefined) return $(".wearing-container .no-items").text(data.message).removeClass("d-none");
-			polygon.populate(data.items, ".wearing-container .template .item", ".wearing-container .items");
-		});
-	},
-
-	wait_for_render: function()
-	{
-		$.get("/thumbs/rawavatar", { UserID: polygon.user.id, x: 352, y: 352 },
-        function(data) 
-        {
-            if (data == "PENDING") window.setTimeout(function() { polygon.character.wait_for_render(); }, 1500);
-            else window.setTimeout(function() { $('.avatar').attr('src', data); }, 1000); //this delay is put here because the avatar was often being displayed before the new one was written
-        });
-	},
-
-	render_avatar: function()
-	{
-		$('.avatar').attr('src', 'https://i.stack.imgur.com/kOnzy.gif');
-		$.post('/api/account/character/request-render', function(){ polygon.character.wait_for_render(); });
-	},
-
-	toggle_wear: function()
-	{
-		var assetID = $(this).attr("data-asset-id");
-		$.post('/api/account/character/toggle-wear', {assetID: assetID}, function(data)
-		{  
-			if(data.success) { polygon.character.get_wardrobe(); polygon.character.get_wearing(); polygon.character.render_avatar(); }
-			else { polygon.buildModal({ header: "Error", body: data.message, buttons: [{'class':'btn btn-primary px-4', 'dismiss':true, 'text':'OK'}]}); }
-		});
-	},
-
-	show_color_panel: function()
-	{
-		var body_part = $(this).attr("data-body-part");
-		polygon.buildModal({ 
-			header: "Choose a "+body_part+" Color", 
-			body: $(".ColorPickerModalTemplate").clone().html(function(_, html){ return html.replace("$body_part", body_part); }).html(), 
-			buttons: []
-		});
-	},
-
-	pick_color: function()
-	{
-		var body_part = $(this).closest(".ColorPickerContainer").attr("data-body-part");
-		$('.modal').modal('hide');
-		$(".ColorChooserRegion[data-body-part='"+body_part+"']").css("background-color", $(this).css("background-color"));
-		$.post("/api/account/character/paint-body", { BodyPart: body_part, Color: $(this).css("background-color")}, function(data)
-		{ 
-			if(data.success) polygon.character.render_avatar();
-			else polygon.buildModal({ header: "Error", body: data.message, buttons: [{'class':'btn btn-primary px-4', 'dismiss':true, 'text':'OK'}]});
-		});
-	}
-}
-
-$(".wardrobe-container .AttireCategorySelector").click(function(){ polygon.character.get_wardrobe($(this).attr("data-asset-type"), 1); });
-$("body").on('click',".toggle-wear", polygon.character.toggle_wear);
-$(".ColorChooserRegion").click(polygon.character.show_color_panel);
-$("body").on('click', ".ColorPickerItem", polygon.character.pick_color);
-$(function()
-{
- 	polygon.pagination.register("wardrobe", function(page){ polygon.character.get_wardrobe(null, page); }); 
-	polygon.character.get_wardrobe(); 
-	polygon.pagination.register("wearing", polygon.character.get_wearing); 
-	polygon.character.get_wearing(); 
-});
-</script>
 <?php pageBuilder::buildFooter(); ?>

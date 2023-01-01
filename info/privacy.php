@@ -16,6 +16,5 @@ pageBuilder::buildHeader();
 	<p class="mb-2">We do not willingly give any of your information to any third-parties.</p>
 	<h4 class="font-weight-normal">Additional Stuff</h4>
 	<p class="mb-2">We do use cookies, and the only cookie we store is your session cookie used to identify you.</p>
-	<p>When you play or host a game, your peer may be able to get your IP address. Click <a href="selfhosting">here</a> for more information.</p>
 </div>
 <?php pageBuilder::buildFooter(); ?>

@@ -1,5 +1,7 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
+
 api::initialize(["method" => "POST", "logged" => true, "secure" => true]);
 
 $wearing = isset($_POST["wearing"]) && $_POST["wearing"] == "true";
@@ -14,8 +16,8 @@ if($wearing)
 }
 else
 {
-	$type_str = catalog::getTypeByNum($type);
-	if(!catalog::getTypeByNum($type)) api::respond(400, false, "Invalid asset type");
+	$type_str = Catalog::GetTypeByNum($type);
+	if(!Catalog::GetTypeByNum($type)) api::respond(400, false, "Invalid asset type");
 	$query = $pdo->prepare("SELECT COUNT(*) FROM ownedAssets INNER JOIN assets ON assets.id = assetId WHERE userId = :uid AND assets.type = :type AND wearing = 0");
 	$query->bindParam(":type", $type, PDO::PARAM_INT);
 }
@@ -23,6 +25,8 @@ $query->bindParam(":uid", $userId, PDO::PARAM_INT);
 $query->execute();
 
 $pages = ceil($query->fetchColumn()/8);
+if($page > $pages) $page = $pages;
+if(!is_numeric($page) || $page < 1) $page = 1;
 $offset = ($page - 1)*8;
 
 if(!$pages) api::respond(200, true, $wearing ? 'You are not currently wearing anything' : 'You don\'t have any unequipped '.($type_str.(!str_ends_with($type_str, 's') ? 's' : '').' to wear'));

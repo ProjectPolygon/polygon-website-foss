@@ -1,5 +1,6 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Thumbnails");
+
 api::initialize(["method" => "POST"]);
 
 $url = $_SERVER['HTTP_REFERER'] ?? false;
@@ -9,7 +10,7 @@ $order = strpos($url, "/home") ? "lastonline DESC" : "id";
 $limit = strpos($url, "/friends") ? 18 : 6;
 $self = str_ends_with($url, "/user") || str_ends_with($url, "/friends") || strpos($url, "/home");
 
-if(!users::getUserInfoFromUid($userId)) api::respond(400, false, "User does not exist");
+if(!Users::GetInfoFromID($userId)) api::respond(400, false, "User does not exist");
 
 $query = $pdo->prepare("SELECT COUNT(*) FROM friends WHERE :uid IN (requesterId, receiverId) AND status = 1");
 $query->bindParam(":uid", $userId, PDO::PARAM_INT);
@@ -18,7 +19,7 @@ $query->execute();
 $pages = ceil($query->fetchColumn()/$limit);
 $offset = ($page - 1)*$limit;
 
-if(!$pages) api::respond(200, true, ($self ? "You do" : users::getUserNameFromUid($userId)." does")."n't have any friends");
+if(!$pages) api::respond(200, true, ($self ? "You do" : Users::GetNameFromID($userId)." does")."n't have any friends");
 
 $query = $pdo->prepare("
 	SELECT friends.*, users.username, users.id AS userId, users.status, users.lastonline FROM friends 
@@ -40,7 +41,7 @@ while($row = $query->fetch(PDO::FETCH_OBJ))
 		"userid" => $row->userId, 
 		"avatar" => Thumbnails::GetAvatar($row->userId, 250, 250),
 		"friendid" => $row->id, 
-		"status" => polygon::filterText($row->status)
+		"status" => Polygon::FilterText($row->status)
 	]; 
 }
 

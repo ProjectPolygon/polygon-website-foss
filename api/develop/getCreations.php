@@ -1,5 +1,7 @@
-<?php
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
+
 api::initialize(["method" => "POST", "logged_in" => true, "secure" => true]);
 
 $userid = SESSION["userId"];
@@ -7,7 +9,7 @@ $type = $_POST["type"] ?? false;
 $page = $_POST["page"] ?? 1;
 $assets = [];
 
-if(!catalog::getTypeByNum($type)) api::respond(400, false, "Invalid asset type");
+if(!Catalog::GetTypeByNum($type)) api::respond(400, false, "Invalid asset type");
 
 $query = $pdo->prepare("SELECT * FROM assets WHERE creator = :uid AND type = :type ORDER BY id DESC");
 $query->bindParam(":uid", $userid, PDO::PARAM_INT);
@@ -16,7 +18,7 @@ $query->execute();
 
 while($asset = $query->fetch(PDO::FETCH_OBJ))
 {
-	$info = catalog::getItemInfo($asset->id);
+	$info = Catalog::GetAssetInfo($asset->id);
 
 	$assets[] = 
 	[

@@ -14,7 +14,7 @@ pageBuilder::buildHeader();
 		<li>Don't say slurs in a demeaning or discriminatory way.</li>
 		<li>Don't post any malicious stuff onsite (dox, IP loggers, etc).</li>
 		<?php // <li>Don't post racist or homo/transphobic stuff. Hey, even if you don't agree with them personally, you don't have to talk about it here.</li> ?>
-		<li>Exploiting is not allowed unless the server hoster allows it.</li>
+		<li>Exploiting is not allowed unless the game owner allows it.</li>
 	</ol>
 	<p class="mb-1">In general, all we ask for is to keep it nice and civil here and don't be overly toxic.</p>
 </div>

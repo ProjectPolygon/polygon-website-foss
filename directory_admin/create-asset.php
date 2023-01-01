@@ -1,6 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-if(!SESSION || !SESSION["adminLevel"]) pageBuilder::errorCode(404);
+Users::RequireAdmin([Users::STAFF_CATALOG, Users::STAFF_ADMINISTRATOR]);
 
 $views = 
 [
@@ -103,7 +103,7 @@ pageBuilder::buildHeader();
 		<p>for regular asset creation (shirts, pants, etc) just use the Develop page</p>
 		<h1 class="font-weight-normal">Important</h1>
 		<p>make sure the asset URLs in your asset are represented as <code>%ASSETURL%</code></p>
-		<p>so for instance, <code>http://chef.pizzaboxer.xyz/asset/?id=1818</code> would be <code>%ASSETURL%1818</code></p>
+		<p>so for instance, <code>http://<?=$_SERVER['HTTP_HOST']?>/asset/?id=1818</code> would be <code>%ASSETURL%1818</code></p>
 	</div>
 	<?php } ?>
 </div>
@@ -112,7 +112,7 @@ pageBuilder::buildHeader();
 	<div class="creation">
 		<div class="row">
 			<div class="col-sm-2 col-3">
-				<a href="$item_url"><img src="$thumbnail" class="img-fluid"></a>
+				<a href="$item_url"><img preload-src="$thumbnail" class="img-fluid"></a>
 			</div>
 			<div class="col-5 pl-0">
 				<a href="$item_url">$name</a>

@@ -1,5 +1,7 @@
 <?php
-include $_SERVER['DOCUMENT_ROOT']."/api/private/db.php";
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/config.php';
+require $_SERVER["DOCUMENT_ROOT"].'/api/private/components/db.php';
+
 if(SITE_CONFIG["api"]["renderserverKey"] != ($_GET['accessKey'] ?? false)) die(http_response_code(403));
 
 $completetype = $_GET['type'] ?? false; //1 = success; 2 = error;

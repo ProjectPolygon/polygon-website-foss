@@ -1,10 +1,15 @@
 <?php
 if(isset($_GET['ModelID'])) $disableHTTPS = true;
+
 require $_SERVER['DOCUMENT_ROOT']."/api/private/core.php";
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Gzip");
+Polygon::ImportClass("Image");
+
 header("Pragma: no-cache");
 header("Cache-Control: no-cache");
 
-users::requireLogin(true);
+Users::RequireLogin(true);
 $userid = SESSION["userId"];
 
 function error($msg)
@@ -52,7 +57,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 	if($modelId) 
 		unlink($_SERVER['DOCUMENT_ROOT']."/asset/files/$modelId");
 	else
-		$modelId = catalog::createAsset([
+		$modelId = Catalog::CreateAsset([
 			"type" => 10, 
 			"creator" => SESSION["userId"], 
 			"name" => $name, 
@@ -63,18 +68,18 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 		]);
 
 	file_put_contents($_SERVER['DOCUMENT_ROOT']."/asset/files/$modelId", $xml);
-	gzip::compress($_SERVER['DOCUMENT_ROOT']."/asset/files/$modelId");
+	Gzip::Compress($_SERVER['DOCUMENT_ROOT']."/asset/files/$modelId");
 
 	if(!$postModelId && $isScript)
     {
     	//put script image as thumbnail
-    	image::renderfromimg("Script", $modelId);
+    	Image::RenderFromStaticImage("Script", $modelId);
     }
     elseif(!$isScript)
     {
     	// user uploaded models are rendered as "usermodels" - this is just normal model rendering except there's no alpha
     	// no roblox thumbnails had transparency up until like 2013 anyway so its not that big of a deal
-    	polygon::requestRender("UserModel", $modelId);
+    	Polygon::RequestRender("UserModel", $modelId);
     }
 }
 
@@ -146,7 +151,7 @@ $models = db::run("SELECT * from assets WHERE creator = :uid AND type = 10 ORDER
 
 				try 
 				{
-                    window.external.WriteSelection().Upload('https://<?=$_SERVER['HTTP_HOST']?>/UI/Save.aspx?ModelID='+modelID+'&Name='+encodeURI(name)+'&Description='+encodeURI(desc)+'&PublicDomain='+free);
+                    window.external.WriteSelection().Upload('http://<?=$_SERVER['HTTP_HOST']?>/UI/Save.aspx?ModelID='+modelID+'&Name='+encodeURI(name)+'&Description='+encodeURI(desc)+'&PublicDomain='+free);
                     $("#Uploading").hide();
                     $("#Uploaded").show();
                	}
@@ -215,7 +220,7 @@ $models = db::run("SELECT * from assets WHERE creator = :uid AND type = 10 ORDER
 			<!--span>To scroll down, press the TAB key.</span><br/-->
 			<span>Select the Model you wish to update: <a href="#" onclick="cancel()">Cancel</a></span></span><br/><br/>
 			<?php while($model = $models->fetch(PDO::FETCH_OBJ)) { ?>
-			<span><a href="#" onclick="publish(<?=$model->id?>)">Select</a> <?=polygon::filterText($model->name)?></span><br/>
+			<span><a href="#" onclick="publish(<?=$model->id?>)">Select</a> <?=Polygon::FilterText($model->name)?></span><br/>
 			<?php } ?>
 		</div>
 		<div id="Uploading" style="font-weight: bold; color: royalblue; margin-top: 5%; display:none;">Uploading. Please wait...</div>

@@ -1,6 +1,6 @@
 <?php
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
-api::initialize(["method" => "POST", "admin" => true, "secure" => true]);
+api::initialize(["method" => "POST", "admin" => [Users::STAFF_MODERATOR, Users::STAFF_ADMINISTRATOR], "secure" => true]);
 
 if(!isset($_POST["banType"]) || !isset($_POST["moderationNote"]) || !isset($_POST["until"])){ api::respond(400, false, "Invalid Request"); }
 if($_POST["banType"] < 1 || $_POST["banType"] > 3){ api::respond(400, false, "Invalid Request"); }

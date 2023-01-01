@@ -1,71 +1,135 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
+Polygon::ImportClass("Thumbnails");
 
-$keyword = $_GET['SearchTextBox'] ?? false;
+$category = $_GET['Category'] ?? "Users";
 $page = $_GET['PageNumber'] ?? 1;
-$keyword_sql = "%$keyword%";
+$keyword = $_GET['SearchTextBox'] ?? "";
+$keyword_sql = "%";
 
-$query = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username LIKE :keywd AND NOT (SELECT COUNT(*) FROM bans WHERE userId = users.id AND NOT isDismissed)");
-$query->bindParam(":keywd", $keyword_sql, PDO::PARAM_STR);
-$query->execute();
+if(strlen($keyword)) $keyword_sql = "%{$keyword}%";
 
-$pages = ceil($query->fetchColumn()/15);
+// if($keyword) $keyword_sql = "*{$keyword}*";
+// else $keyword_sql = "*";
+
+if($category == "Groups")
+{
+	// WHERE MATCH (name) AGAINST (:keywd IN NATURAL LANGUAGE MODE)
+
+	$querycount = "SELECT COUNT(*) FROM groups WHERE name LIKE :keywd AND NOT deleted";
+
+	$querystring = 
+	"SELECT *, 
+	(SELECT COUNT(*) FROM groups_members WHERE GroupID = groups.id AND NOT Pending) AS MemberCount 
+	FROM groups WHERE name LIKE :keywd AND NOT deleted
+	ORDER BY MemberCount DESC";
+
+	pageBuilder::$pageConfig["title"] = "Browse Groups";
+}
+else
+{
+	// WHERE MATCH (username) AGAINST (:keywd IN NATURAL LANGUAGE MODE)
+
+	$querycount = 
+	"SELECT COUNT(*) FROM users WHERE username LIKE :keywd
+	AND NOT (SELECT COUNT(*) FROM bans WHERE userId = users.id AND NOT isDismissed)";
+
+	$querystring = 
+	"SELECT * FROM users WHERE username LIKE :keywd
+	AND NOT (SELECT COUNT(*) FROM bans WHERE userId = users.id AND NOT isDismissed) 
+	ORDER BY lastonline DESC";
+
+	pageBuilder::$pageConfig["title"] = "Browse People";
+}
+
+$count = db::run($querycount, [":keywd" => $keyword_sql])->fetchColumn();
+
+$pages = ceil($count/15);
 if($page > $pages) $page = $pages;
 if(!is_numeric($page) || $page < 1) $page = 1;
 $offset = ($page - 1)*15;
 
-$query = $pdo->prepare("SELECT * FROM users WHERE username LIKE :keywd AND NOT (SELECT COUNT(*) FROM bans WHERE userId = users.id AND NOT isDismissed) ORDER BY lastonline DESC LIMIT 15 OFFSET $offset");
-$query->bindParam(":keywd", $keyword_sql, PDO::PARAM_STR);
-$query->execute();
+$results = db::run(
+	"$querystring LIMIT 15 OFFSET $offset",
+	[":keywd" => $keyword_sql]
+);
 
 function buildURL($page)
 {
 	global $keyword;
+	global $category;
+
 	$url = "?";
 	if($keyword) $url .= "SearchTextBox=$keyword&";
+	$url .= "Category=$category&";
 	$url .= "PageNumber=$page";
 	return $url;
 }
 
-pageBuilder::$pageConfig["title"] = "Browse People";
 pageBuilder::buildHeader();
 ?>
 <form>
-	<div class="form-group row">
-	    <label for="SearchTextBox" class="col-sm-1 col-form-label">Search: </label>
-	    <input type="text" class="form-control col-sm-7 mx-2" name="SearchTextBox" id="SearchTextBox" value="<?=htmlspecialchars($keyword)?>">
-	    <button class="btn btn-light">Search Users</button>
+	<div class="form-group row m-0">
+		<div class="col-sm-9 px-1 mb-2">
+			<input type="text" class="form-control form-control-sm" name="SearchTextBox" id="SearchTextBox" value="<?=htmlspecialchars($keyword)?>" placeholder="Search...">
+		</div>
+		<div class="col-sm-3 px-0 d-inline-flex">
+			<div class="w-50 px-1 d-inline-block">
+				<button class="btn btn-sm btn-block btn-light px-1" name="Category" value="Users">Search Users</button>
+			</div>
+			<div class="w-50 px-1 d-inline-block">
+				<button class="btn btn-sm btn-block btn-light px-1" name="Category" value="Groups">Search Groups</button>
+			</div>
+		</div>
 	</div>
-	<?php if($query->rowCount()) { ?>
-	<table class="table table-hover">
-	  	<thead class="table-bordered bg-light">
-	    	<tr>
-	      		<th class="font-weight-normal py-2" scope="col" style="width:5%">Avatar</th>
-	      		<th class="font-weight-normal py-2" scope="col" style="width:20%">Name</th>
-	      		<th class="font-weight-normal py-2" scope="col" style="width:50%">Blurb</th>
-	      		<th class="font-weight-normal py-2" scope="col" style="width:20%">Location / Last Seen</th>
-	    	</tr>
-	  	</thead>
-	  	<tbody>
-	  		<?php while($row = $query->fetch(PDO::FETCH_OBJ)) { $status = users::getOnlineStatus($row->id); ?>
-	    	<tr>
-	      		<td><img src="<?=Thumbnails::GetAvatar($row->id, 100, 100)?>" title="<?=$row->username?>" alt="<?=$row->username?>" width="63" height="63"></td>
-	      		<td><a href="/user?ID=<?=$row->id?>"><?=$row->username?></a></td>
-	      		<td class="text-break"><?=polygon::filterText($row->blurb)?></td>
-	      		<td><span<?=$status["attributes"]?:''?>><?=$status["text"]?></span></td>
-	    	</tr>
-			<?php } ?>
-	  	</tbody>
-	</table>
-	<?php } else { ?>
-	<p class="text-center">No results matched your search query</p>
-	<?php } if($pages > 1) { ?>
-	<div class="pagination form-inline justify-content-center">
-		<a class="btn btn-light back<?=$page<=1?' disabled':'" href="'.buildURL($page-1)?>"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></a>
-		<span class="px-3">Page <?=$page?> of <?=$pages?></span>
-		<a class="btn btn-light next<?=$page>=$pages?' disabled':'" href="'.buildURL($page+1)?>"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></a>
-	</div>
-	<?php } ?>
 </form>
-<?php pageBuilder::buildFooter(); ?>
+<?php if($results->rowCount()) { ?>
+<table class="table table-hover">
+	<?php if($category != "Groups") { ?>
+	<thead class="bg-light">
+	    <tr>
+	      	<th class="font-weight-normal py-2" scope="col" style="width:5%">Avatar</th>
+	      	<th class="font-weight-normal py-2" scope="col" style="width:20%">Name</th>
+	      	<th class="font-weight-normal py-2" scope="col" style="width:50%">Blurb</th>
+	      	<th class="font-weight-normal py-2" scope="col" style="width:20%">Location / Last Seen</th>
+	    </tr>
+	</thead>
+	<tbody>
+	  	<?php while($row = $results->fetch(PDO::FETCH_OBJ)) { $status = Users::GetOnlineStatus($row->id); ?>
+	    <tr>
+	      	<td><a href="/user?ID=<?=$row->id?>"><img src="<?=Thumbnails::GetAvatar($row->id, 100, 100)?>" title="<?=$row->username?>" alt="<?=$row->username?>" width="63" height="63"></a></td>
+	      	<td class="text-break"><a href="/user?ID=<?=$row->id?>"><?=$row->username?></a></td>
+	      	<td class="text-break"><?=Polygon::FilterText($row->blurb)?></td>
+	      	<td><span<?=$status["attributes"]?:''?>><?=$status["text"]?></span></td>
+	    </tr>
+		<?php } ?>
+	</tbody>
+	<?php } elseif($category == "Groups") { ?>
+	<thead class="bg-light">
+		<tr>
+			<th class="font-weight-normal py-2" scope="col" style="width:5%"></th>
+			<th class="font-weight-normal py-2" scope="col" style="width:20%">Group</th>
+			<th class="font-weight-normal py-2" scope="col" style="width:70%">Description</th>
+			<th class="font-weight-normal py-2" scope="col" style="width:5%">Members</th>
+		</tr>
+	</thead>
+	<tbody>
+		<?php while($row = $results->fetch(PDO::FETCH_OBJ)) { $status = Users::GetOnlineStatus($row->id); ?>
+		<tr>
+			<td><a href="/groups?gid=<?=$row->id?>"><img src="<?=Thumbnails::GetAssetFromID($row->emblem, 420, 420)?>" title="<?=$row->name?>" alt="<?=$row->name?>" width="63" height="63"></a></td>
+			<td class="text-break"><a href="/groups?gid=<?=$row->id?>"><?=Polygon::FilterText($row->name)?></a></td>
+			<td class="text-break"><?=Polygon::FilterText($row->description)?></td>
+			<td><?=$row->MemberCount?></td>
+		</tr>
+		<?php } ?>
+	</tbody>
+	<?php } ?>
+</table>
+<?php } else { ?>
+<p class="text-center">No results matched your search query</p>
+<?php } if($pages > 1) { ?>
+<div class="pagination form-inline justify-content-center">
+	<a class="btn btn-light back<?=$page<=1?' disabled':'" href="'.buildURL($page-1)?>"><h5 class="mb-0"><i class="fal fa-caret-left"></i></h5></a>
+	<span class="px-3">Page <?=$page?> of <?=$pages?></span>
+	<a class="btn btn-light next<?=$page>=$pages?' disabled':'" href="'.buildURL($page+1)?>"><h5 class="mb-0"><i class="fal fa-caret-right"></i></h5></a>
+</div>
+<?php } pageBuilder::buildFooter(); ?>

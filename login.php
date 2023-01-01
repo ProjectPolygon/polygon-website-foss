@@ -1,6 +1,6 @@
 <?php 
 require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-users::requireLoggedOut();
+Users::RequireLoggedOut();
 
 $errors = ["username" => false, "password" => false];
 $username = $password = false;
@@ -11,21 +11,23 @@ $returnurl = str_starts_with($returnurl_raw, "https://".$_SERVER['HTTP_HOST']) ?
 
 if($_SERVER['REQUEST_METHOD'] == 'POST')
 {
+	Polygon::ImportClass("Auth");
+
 	$username = $_POST['username'] ?? false;
 	$password = $_POST['password'] ?? false;
 	$pwresult = false;
-	$userInfo = users::getUserInfoFromUserName($username);
-	$auth = new auth($password);
+	$userInfo = Users::GetInfoFromName($username);
+	$auth = new Auth($password);
 
 	if(!$password) $errors["password"] = "Please enter your password";
 	if(!$username) $errors["username"] = "Please enter your username";
 	elseif(!$userInfo) $errors["username"] = "That user doesn't exist";
-	elseif(!$auth->verifyPassword($userInfo->password)) $errors["password"] = "Incorrect password";
+	elseif(!$auth->VerifyPassword($userInfo->password)) $errors["password"] = "Incorrect password";
 
 	if(!$errors["username"] && !$errors["password"])
 	{
 		// upgrade password to argon2id w/ encryption if still using bcrypt
-		if(strpos($userInfo->password, "$2y$10") !== false) $auth->updatePassword($userInfo->id);
+		if(strpos($userInfo->password, "$2y$10") !== false) $auth->UpdatePassword($userInfo->id);
 		session::createSession($userInfo->id);
 		if($userInfo->twofa)
 		{
@@ -51,7 +53,7 @@ pageBuilder::buildHeader();
 			<div class="form-group row">
 				<label for="username" class="col<?=!$studio?'-sm':''?>-3 col-form-label">Username: </label>
 				<div class="col<?=!$studio?'-sm':''?>-9">
-				  	<input type="text" class="form-control<?=$errors["username"]?' is-invalid':''?>" name="username" id="username" value="<?=$username?>" autocomplete="username">
+				  	<input type="text" class="form-control<?=$errors["username"]?' is-invalid':''?>" name="username" id="username" value="<?=htmlspecialchars($username)?>" autocomplete="username">
 				  	<p class="invalid-feedback username-err"<?=$errors["username"]?' style="display:block"':''?>><?=$errors["username"]?></p>
 				</div>
 			</div>
@@ -92,7 +94,7 @@ pageBuilder::buildHeader();
 				  		<p class="card-text mb-0">- more text goes here</p>
 				  	</div>
 				  	<div class="col">
-				  		<a href="/register" class="btn btn-lg btn-success mx-auto d-block">Sign Up</a>
+				  		<a href="/" class="btn btn-lg btn-success mx-auto d-block">Sign Up</a>
 				  	</div>
 		  		</div>
 		  	</div>

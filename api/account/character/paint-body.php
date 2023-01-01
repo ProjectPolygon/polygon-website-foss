@@ -8,7 +8,7 @@ $bodyPart = $_POST["BodyPart"] ?? false;
 $color = $_POST["Color"] ?? false;
 
 if(!$color || !in_array($bodyPart, ["Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"])) api::respond(400, false, "Bad Request");
-$brickcolor = users::hex2bc(rgbtohex($color));
+$brickcolor = Users::hex2bc(rgbtohex($color));
 if(!$brickcolor) api::respond(200, false, "Invalid body color #".rgbtohex($color));
 $bodyColors->{$bodyPart} = $brickcolor;
 $bodyColors = json_encode($bodyColors);

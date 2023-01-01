@@ -1,23 +1,26 @@
-<?php 
-require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php'; 
-//users::requireLogin();
+<?php require $_SERVER['DOCUMENT_ROOT'].'/api/private/core.php';
+Polygon::ImportClass("Catalog");
+Polygon::ImportClass("Thumbnails");
 
-$item = catalog::getItemInfo($_GET['ID'] ?? $_GET['id'] ?? false);
+Users::RequireLogin();
+
+$item = Catalog::GetAssetInfo($_GET['ID'] ?? $_GET['id'] ?? false);
 if(!$item) pageBuilder::errorCode(404);
-$ownsAsset = SESSION && catalog::ownsAsset(SESSION["userId"], $item->id);
-$isCreator = SESSION && (SESSION["adminLevel"] || $item->creator == SESSION["userId"]);
+$ownsAsset = SESSION && Catalog::OwnsAsset(SESSION["userId"], $item->id);
+$isCreator = SESSION && $item->creator == SESSION["userId"];
+$isAdmin = Users::IsAdmin();
 
 if($_SERVER['REQUEST_URI'] != "/".encode_asset_name($item->name)."-item?id=".$item->id) redirect("/".encode_asset_name($item->name)."-item?id=".$item->id);
 
-if(SESSION && SESSION["adminLevel"]) pageBuilder::$polygonScripts[] = "/js/polygon/admin/asset-moderation.js?t=".time();
-pageBuilder::$pageConfig['title'] = polygon::filterText($item->name).", ".vowel(catalog::getTypeByNum($item->type))." by ".$item->username;
-pageBuilder::$pageConfig["og:description"] = polygon::filterText($item->description);
+if(Users::IsAdmin()) pageBuilder::$polygonScripts[] = "/js/polygon/admin/asset-moderation.js?t=".time();
+pageBuilder::$pageConfig['title'] = Polygon::FilterText($item->name).", ".vowel(Catalog::GetTypeByNum($item->type))." by ".$item->username;
+pageBuilder::$pageConfig["og:description"] = Polygon::FilterText($item->description);
 pageBuilder::$pageConfig["og:image"] = Thumbnails::GetAsset($item, 420, 420);
 pageBuilder::$pageConfig["app-attributes"] = ' data-asset-id="'.$item->id.'"';
 pageBuilder::buildHeader();
 ?>
 <div class="container" style="max-width: 58rem">
-	<?php if($ownsAsset || $isCreator) { ?> 
+	<?php if($ownsAsset || $isCreator || $isAdmin) { ?> 
 	<div class="dropdown d-flex justify-content-end float-right">
 		<a class="btn btn-sm btn-light py-0 px-1" href="#" role="button" id="configure-asset" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 			<span class="fa-stack">
@@ -26,19 +29,20 @@ pageBuilder::buildHeader();
 			</span>
 		</a>
 		<div class="dropdown-menu dropdown-menu-right bg-light" aria-labelledby="configure-asset">
-			<?php if($isCreator) { ?>
+			<?php if($isCreator || Users::IsAdmin([Users::STAFF_CATALOG, Users::STAFF_ADMINISTRATOR])) { ?>
 			<a class="dropdown-item" href="/my/item?ID=<?=$item->id?>">Configure</a>
 			<?php } if($ownsAsset) { ?>
 			<a class="dropdown-item delete-item-prompt" href="#" data-item-id="<?=$item->id?>">Delete from My Stuff</a>
-			<?php } if(SESSION["adminLevel"]) { ?>
+			<?php } if(Users::IsAdmin()) { ?>
 			<a class="dropdown-item asset-<?=$item->approved==1?'decline':'approve'?>" href="#"><?=$item->approved==1?'Disa':'A'?>pprove Asset</a>
+			<?php } if(Users::IsAdmin([Users::STAFF_CATALOG, Users::STAFF_ADMINISTRATOR])) { ?>
 			<a class="dropdown-item asset-rerender" href="#">Request Re-render</a>
 			<?php } ?>
 		</div>
 	</div>
 	<?php } ?> 
-	<h1 class="font-weight-normal"><?=polygon::filterText($item->name)?></h1>
-	<h5 class="font-weight-normal"><?=SITE_CONFIG["site"]["name"]?> <?=catalog::getTypeByNum($item->type)?></h5>
+	<h1 class="font-weight-normal"><?=Polygon::FilterText($item->name)?></h1>
+	<h5 class="font-weight-normal"><?=SITE_CONFIG["site"]["name"]?> <?=Catalog::GetTypeByNum($item->type)?></h5>
 	<div class="row">
 		<div class="col-lg-4 col-md-6 col-sm-12 pb-3">
 			<img src="<?=Thumbnails::GetAsset($item, 420, 420)?>" class="img-fluid mt-3" border="0">
@@ -55,12 +59,12 @@ pageBuilder::buildHeader();
 				</div>
 			</div>
 			<?php if(strlen($item->description)) { ?> 
-			<p><?=nl2br(polygon::filterText($item->description))?></p>
+			<p><?=nl2br(Polygon::FilterText($item->description))?></p>
 			<hr>
 			<?php } if($item->type == 19) { ?> 
 			<small class="text-muted">Gear Attributes:</small><br>
 			<?php foreach(json_decode($item->gear_attributes) as $attr => $enabled) { if($enabled) { ?> 
-			<div class="gear-attribute"><i class="<?=catalog::$gear_attr_display[$attr]["icon"]?>"></i> <small><?=catalog::$gear_attr_display[$attr]["text_item"]?></small></div>
+			<div class="gear-attribute"><i class="<?=Catalog::$GearAttributesDisplay[$attr]["icon"]?>"></i> <small><?=Catalog::$GearAttributesDisplay[$attr]["text_item"]?></small></div>
 			<?php } } } ?> 
 			<?php if($item->type == 3) { ?> 
 			<audio src="/asset/?id=<?=$item->id?>&audiostream=true" controls="controls" style="max-height:30px;width:100%">
@@ -69,7 +73,7 @@ pageBuilder::buildHeader();
 			<?php } ?> 
 		</div>
 		<div class="col-lg-3 col-md-12 col-sm-6 pl-0 d-flex justify-content-lg-end justify-content-center" style="align-items:flex-start">
-			<div class="card text-center bg-light px-3 py-2 BuyPriceBox">
+			<div class="card text-center bg-cardpanel px-3 py-2 BuyPriceBox">
 				<?php if($item->sale){ ?>
 				<p class="mb-1">Price: <span class="text-success"><?=$item->price?'<i class="fal fa-pizza-slice"></i> '.$item->price:'FREE'?></span></p>
 				<?php } if($ownsAsset) { ?>
@@ -77,7 +81,7 @@ pageBuilder::buildHeader();
 					<button class="btn btn-success disabled px-4" disabled><h5 class="font-weight-normal mb-1"><?=!$item->sale || $item->price ? 'Buy Now':'Take One'?></h5></button>
 				</span>
 				<?php } elseif($item->sale) { ?>
-				<button data-asset-type="<?=catalog::getTypeByNum($item->type)?>" class="btn btn-success px-4 purchase-item-prompt" data-item-name="<?=htmlspecialchars($item->name)?>" data-item-id="<?=$item->id?>" data-expected-price="<?=$item->price?>" data-seller-name="<?=$item->username?>"><h5 class="font-weight-normal mb-1"><?=$item->price?'Buy Now':'Take One'?></h5></button>
+				<button data-asset-type="<?=Catalog::GetTypeByNum($item->type)?>" class="btn btn-success px-4 purchase-item-prompt" data-item-name="<?=htmlspecialchars($item->name)?>" data-item-id="<?=$item->id?>" data-expected-price="<?=$item->price?>" data-seller-name="<?=$item->username?>"><h5 class="font-weight-normal mb-1"><?=$item->price?'Buy Now':'Take One'?></h5></button>
 				<?php } else { ?>
 				<span class="disabled-wrapper" data-toggle="tooltip" data-placement="top" data-original-title="This item is no longer for sale">
 					<button class="btn btn-success disabled px-4" disabled><h5 class="font-weight-normal mb-1">Buy Now</h5></button>
@@ -140,7 +144,7 @@ pageBuilder::buildHeader();
 		<div class="template d-none">
 			<div class="row comment">
 				<div class="col-2 pr-0 mb-3">
-					<a href="/user?ID=$commenter_id"><img src="$commenter_avatar" class="img-fluid"></a>
+					<a href="/user?ID=$commenter_id"><img preload-src="$commenter_avatar" class="img-fluid"></a>
 				</div>
 				<div class="col-10 mb-3">
 					<div class="card">
